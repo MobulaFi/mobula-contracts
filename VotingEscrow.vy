@@ -1,4 +1,3 @@
- 
 # @version 0.2.4
 """
 @title Voting Escrow
@@ -116,13 +115,10 @@ future_admin: public(address)
 
 
 @external
-def __init__(token_addr: address, _name: String[64], _symbol: String[32], _version: String[32]):
+def __init__(token_addr: address):
     """
     @notice Contract constructor
-    @param token_addr `ERC20CRV` token address
-    @param _name Token name
-    @param _symbol Token symbol
-    @param _version Contract version - required for Aragon compatibility
+    @param token_addr `MOBL` token address
     """
     self.admin = msg.sender
     self.token = token_addr
@@ -135,9 +131,9 @@ def __init__(token_addr: address, _name: String[64], _symbol: String[32], _versi
     assert _decimals <= 255
     self.decimals = _decimals
 
-    self.name = _name
-    self.symbol = _symbol
-    self.version = _version
+    self.name = "Mobula"
+    self.symbol = "MOBL"
+    self.version = "1.0"
 
 
 @external
@@ -419,7 +415,7 @@ def create_lock(_value: uint256, _unlock_time: uint256):
     self.assert_not_contract(msg.sender)
     unlock_time: uint256 = (_unlock_time / WEEK) * WEEK  # Locktime is rounded down to weeks
     _locked: LockedBalance = self.locked[msg.sender]
-
+    
     assert _value > 0  # dev: need non-zero value
     assert _locked.amount == 0, "Withdraw old tokens first"
     assert unlock_time > block.timestamp, "Can only lock until time in the future"
