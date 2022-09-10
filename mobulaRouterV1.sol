@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.17;
 
 /*
     
@@ -64,7 +64,7 @@ contract MobulaRouterV1 {
         admins[msg.sender] = true;
     }
 
-    event swap(address indexed from, address indexed to, uint256 amountIn, uint256 amountOut, address tokenFrom, address tokenTo);
+    event swap(address indexed from);
 
     IERC20 WETH = IERC20(ETH);
     uint256 fee = 9970;
@@ -146,7 +146,7 @@ contract MobulaRouterV1 {
         mobulaSwap(factory,amounts,path,to);
 
         require(IERC20(path[path.length - 1]).balanceOf(to) - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
-        emit swap(msg.sender,to,amountIn,amountOutMin,path[0],path[path.length - 1]);
+        emit swap(msg.sender);
     }
 
     function multiSwapTokensForExactTokens(address factory,uint256 amountOut,uint256 amountInMax, address[] calldata path, address to, uint256 newFee,uint256 deadline) external {
@@ -161,7 +161,7 @@ contract MobulaRouterV1 {
         
         IERC20(path[0]).transferFrom(msg.sender,IFactory(factory).getPair(path[0],path[1]),amounts[0]);
         mobulaSwap(factory,amounts,path,to);
-        emit swap(msg.sender,to,_specialInput,amountOut,path[0],path[path.length - 1]);
+        emit swap(msg.sender);
 
     }
 
@@ -185,7 +185,7 @@ contract MobulaRouterV1 {
         require(sent, "MobulaRouter: Failed to send Ether back");
 
         require(to.balance - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
-        emit swap(msg.sender,to,amountIn,amountOutMin,path[0],path[path.length - 1]);
+        emit swap(msg.sender);
     }
 
     function multiSwapTokensForExactETH(address factory,uint256 amountOut,uint256 amountInMax,address[] calldata path,address to, uint256 newFee,uint256 deadline) external payable {
@@ -206,7 +206,7 @@ contract MobulaRouterV1 {
         IWETH(ETH).withdraw(WETH.balanceOf(address(this)));
         (bool sent,) = payable(to).call{value: address(this).balance}("");
         require(sent, "MobulaRouter: Failed to send Ether back");
-        emit swap(msg.sender,to,_specialInput,amountOut,path[0],path[path.length - 1]);
+        emit swap(msg.sender);
 
     }
 
@@ -224,8 +224,12 @@ contract MobulaRouterV1 {
         WETH.transfer(IFactory(factory).getPair(path[0],path[1]),amounts[0]);
         mobulaSwap(factory, amounts, path, to);
 
+        
         require(IERC20(path[path.length - 1]).balanceOf(to) - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
-        emit swap(msg.sender,to,msg.value,amountOutMin,path[0],path[path.length - 1]);
+        
+        emit swap(msg.sender);
+        
+        
     }
 
     function multiSwapETHForExactTokens(address factory, uint256 amountOut,uint256 amountInMax,address[] calldata path,address to, uint256 newFee,uint256 deadline) external payable {
@@ -245,7 +249,8 @@ contract MobulaRouterV1 {
             (bool sent,) = msg.sender.call{value:msg.value - _specialInput}("");
             require(sent, 'MobulaRouter: Failed to send Ether back');
         }
-        emit swap(msg.sender,to,_specialInput,amountOut,path[0],path[path.length - 1]);
+        
+        emit swap(msg.sender);
 
     }
 
