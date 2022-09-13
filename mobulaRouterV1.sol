@@ -3,13 +3,10 @@
 pragma solidity ^0.8.17;
 
 /*
-    
   Mobula Router v1
 
   Website:  https://mobula.fi/
   Telegram: https://t.me/MobulaFi
- 
-
 */
 
 
@@ -29,7 +26,6 @@ interface IPair {
 
     function factory() external view returns (address);
     function token0() external view returns (address);
-    function token1() external view returns (address);
     function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
 
@@ -60,6 +56,9 @@ contract MobulaRouterV1 {
     address public ETH = 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270;
     address mobulaTreasury = 0x7189384C1a46DBc5265bd0bd040E06F76761Ef24;
 
+    //address public ETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; BSC
+
+
     constructor() {
         admins[msg.sender] = true;
     }
@@ -74,7 +73,7 @@ contract MobulaRouterV1 {
     fallback() external payable {}
 
     function setAdmin(address _admin, bool _status) public {
-        require(admins[msg.sender], "Not admin");
+        require(admins[msg.sender]);
         admins[_admin] = _status;
     }
 
@@ -96,14 +95,14 @@ contract MobulaRouterV1 {
 
     function wrapEther(uint256 amount) external payable {
 
-            
+        require(msg.value == amount);
         IWETH(ETH).deposit{value: amount}();
         WETH.transfer(msg.sender, amount);
     }
 
     function unwrapEther(uint256 amount) external payable {
 
-        require(WETH.allowance(msg.sender, address(this)) > amount, "Allowance too low.");
+        require(WETH.allowance(msg.sender, address(this)) >= amount, "Allowance too low");
 
         WETH.transferFrom(msg.sender,address(this),amount);
         IWETH(ETH).withdraw(amount);
@@ -130,6 +129,90 @@ contract MobulaRouterV1 {
 
         }
 
+    }
+
+    function mobulaSwapSupportingFee(address factory,address[] memory path,address to) internal {
+
+        for(uint256 i = 0; i < path.length - 1; i++){
+        
+            IPair pair = IPair(IFactory(factory).getPair(path[i],path[i+1]));
+            uint amountInput;
+            uint amountOutput;
+            {
+            (uint reserve0, uint reserve1,) = pair.getReserves();
+            (uint reserveInput, uint reserveOutput) = pair.token0() == path[i] ? (reserve0, reserve1) : (reserve1, reserve0);
+            amountInput = IERC20(path[i]).balanceOf(address(pair)) - reserveInput;
+            amountOutput = getAmountOut(amountInput, reserveInput, reserveOutput);
+            }
+            (uint amount0Out, uint amount1Out) = pair.token0() == path[i] ? (uint(0), amountOutput) : (amountOutput, uint(0));
+            address localTo = i < path.length - 2 ? IFactory(factory).getPair(path[i+1],path[i+2]) : to;
+            pair.swap(amount0Out, amount1Out, localTo, new bytes(0));
+
+        }
+
+    }
+
+    function multiSwapExactTokensForTokensSupportingFee(
+        address factory,
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 newFee,
+        uint deadline
+    ) external {
+        require(block.timestamp <= deadline, "MobulaRouter: EXPIRED");
+        fee = newFee;
+        uint256 swapAmountIn = takeMobulaFeeToken(path[0],amountIn);
+        uint256 userBalanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
+        IERC20(path[0]).transferFrom(msg.sender,IFactory(factory).getPair(path[0],path[1]),swapAmountIn);
+
+        mobulaSwapSupportingFee(factory,path, to);
+        require(IERC20(path[path.length - 1]).balanceOf(to) - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low");
+        emit swap(msg.sender);
+    }
+
+    function multiSwapExactETHForTokensSupportingFee(
+        address factory,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 newFee,
+        uint deadline
+    ) external payable{
+        require(block.timestamp <= deadline, "MobulaRouter: EXPIRED");
+        fee = newFee;
+        uint256 userBalanceBefore = IERC20(path[path.length - 1]).balanceOf(to);
+        IWETH(ETH).deposit{value: msg.value}();
+        uint256 swapAmountIn = takeMobulaFeeETH(msg.value);
+        WETH.transfer(IFactory(factory).getPair(path[0],path[1]),swapAmountIn);
+
+        mobulaSwapSupportingFee(factory,path, to);
+        require(IERC20(path[path.length - 1]).balanceOf(to) - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
+        emit swap(msg.sender);
+    }
+
+    function multiSwapExactTokensForETHSupportingFee(address factory,uint256 amountIn,uint256 amountOutMin,address[] calldata path,address to, uint256 newFee,uint256 deadline) external payable {
+
+        require(block.timestamp <= deadline, "MobulaRouter: EXPIRED");
+        fee = newFee;
+
+        uint256 swapAmountIn = takeMobulaFeeToken(path[0],amountIn);
+        uint256 userBalanceBefore = to.balance;
+        uint256 contractBalanceBefore = address(this).balance;
+
+        require(IERC20(path[0]).allowance(msg.sender, address(this)) >= amountIn, "MobulaRouter: Allowance too low.");
+
+        IERC20(path[0]).transferFrom(msg.sender,IFactory(factory).getPair(path[0],path[1]),swapAmountIn);
+        mobulaSwapSupportingFee(factory,path,address(this));
+
+
+        IWETH(ETH).withdraw(WETH.balanceOf(address(this)));
+        (bool sent,) = payable(to).call{value: address(this).balance - contractBalanceBefore}("");
+        require(sent, "MobulaRouter: Failed to send Ether back");
+
+        require(to.balance - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
+        emit swap(msg.sender);
     }
 
     function multiSwapExactTokensForTokens(address factory,uint256 amountIn, uint256 amountOutMin, address[] calldata path,address to, uint256 newFee,uint256 deadline) external {
@@ -172,6 +255,7 @@ contract MobulaRouterV1 {
 
         uint256 swapAmountIn = takeMobulaFeeToken(path[0],amountIn);
         uint256 userBalanceBefore = to.balance;
+        uint256 contractBalanceBefore = address(this).balance;
 
         require(IERC20(path[0]).allowance(msg.sender, address(this)) >= amountIn, "MobulaRouter: Allowance too low.");
         uint[] memory amounts = getAmountsOut(factory,swapAmountIn,path);
@@ -179,9 +263,9 @@ contract MobulaRouterV1 {
         IERC20(path[0]).transferFrom(msg.sender,IFactory(factory).getPair(path[0],path[1]),amounts[0]);
         mobulaSwap(factory,amounts,path,address(this));
 
-
+        
         IWETH(ETH).withdraw(WETH.balanceOf(address(this)));
-        (bool sent,) = payable(to).call{value: address(this).balance}("");
+        (bool sent,) = payable(to).call{value: address(this).balance - contractBalanceBefore}("");
         require(sent, "MobulaRouter: Failed to send Ether back");
 
         require(to.balance - userBalanceBefore >= amountOutMin, "MobulaRouter: Slippage too low.");
@@ -192,7 +276,7 @@ contract MobulaRouterV1 {
 
         require(block.timestamp <= deadline, "MobulaRouter: EXPIRED");
         fee = newFee;
-
+        uint256 contractBalanceBefore = address(this).balance;
         uint[] memory amounts = getAmountsIn(factory,amountOut,path);
         uint256 _specialInput = specialInput(factory,amountOut,path);
         require(_specialInput <= amountInMax,"MobulaRouter: Slippage too low");
@@ -204,7 +288,7 @@ contract MobulaRouterV1 {
         mobulaSwap(factory,amounts,path,address(this));
 
         IWETH(ETH).withdraw(WETH.balanceOf(address(this)));
-        (bool sent,) = payable(to).call{value: address(this).balance}("");
+        (bool sent,) = payable(to).call{value: address(this).balance - contractBalanceBefore}("");
         require(sent, "MobulaRouter: Failed to send Ether back");
         emit swap(msg.sender);
 
@@ -218,7 +302,7 @@ contract MobulaRouterV1 {
         IWETH(ETH).deposit{value: msg.value}();
         uint256 swapAmountIn = takeMobulaFeeETH(msg.value);
         uint[] memory amounts = getAmountsOut(factory,swapAmountIn,path);
-        require(swapAmountIn >= amounts[0], "MobulaRouter: Deposited amount too low.");
+        require(swapAmountIn >= amounts[0], "MobulaRouter: Deposited ether amount too low.");
 
         
         WETH.transfer(IFactory(factory).getPair(path[0],path[1]),amounts[0]);
@@ -232,13 +316,13 @@ contract MobulaRouterV1 {
         
     }
 
-    function multiSwapETHForExactTokens(address factory, uint256 amountOut,uint256 amountInMax,address[] calldata path,address to, uint256 newFee,uint256 deadline) external payable {
+    function multiSwapETHForExactTokens(address factory, uint256 amountOut,address[] calldata path,address to, uint256 newFee,uint256 deadline) external payable {
 
         require(block.timestamp <= deadline, "MobulaRouter: EXPIRED");
         fee = newFee;
         uint[] memory amounts = getAmountsIn(factory,amountOut,path);
         uint256 _specialInput = specialInput(factory,amountOut,path);
-        require(_specialInput <= amountInMax,"MobulaRouter: Slippage too low");
+        require(_specialInput <= msg.value,"MobulaRouter: Slippage too low");
         IWETH(ETH).deposit{value: _specialInput}();
 
         WETH.transfer(mobulaTreasury,_specialInput - amounts[0]);
