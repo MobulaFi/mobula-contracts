@@ -60,6 +60,9 @@ contract MobulaGovernor {
         Status status;
     }
 
+    event Vote(address indexed voter, uint indexed proposalId, VotingOptions vote);
+    event CreatedProposal(address indexed creator, uint indexed proposalId);
+
     mapping(uint256 => Proposal) public proposals;
     mapping(address => mapping(uint256 => bool)) public votes;
     mapping(address => uint256) public shares;
@@ -113,7 +116,10 @@ contract MobulaGovernor {
             0,
             Status.Pending
         );
+        
+        emit CreatedProposal(msg.sender, nextProposalId);
         nextProposalId++;
+        
     }
 
     function vote(uint256 _proposalId, VotingOptions _vote) external {
@@ -139,6 +145,7 @@ contract MobulaGovernor {
                 proposal.status = Status.Rejected;
             }
         }
+        emit Vote(msg.sender, _proposalId, _vote);
     }
 
     function getLiveProposals(uint256 top)
