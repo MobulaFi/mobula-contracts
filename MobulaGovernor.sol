@@ -107,6 +107,9 @@ contract MobulaGovernor {
         Status status;
     }
 
+    event Vote(address indexed voter, uint indexed proposalId, VotingOptions vote);
+    event CreatedProposal(address indexed creator, uint indexed proposalId);
+
     mapping(uint256 => Proposal) public proposals;
     mapping(address => mapping(uint256 => bool)) public votes;
     mapping(address => uint256) public lastVote;
@@ -132,7 +135,25 @@ contract MobulaGovernor {
         votingEscrowAddress = _votingEscrowAddress;
     }
 
+    function checkClosing() internal {
 
+        Proposal[] memory _proposals = getLiveProposals(nextProposalId);
+        uint256 totalShares = getTotalShares();
+
+        for(uint i = 0; i <_proposals.length; i++){
+            Proposal memory _proposal = _proposals[i];
+
+            if(_proposal.createdAt + 3 * 24 * 3600 < block.timestamp &&
+            (_proposal.votesForYes + _proposal.votesForNo >= totalShares * 5/100))
+            {
+
+                proposals[_proposal.id].status = _proposal.votesForYes > _proposal.votesForNo ? Status.Accepted : Status.Rejected;
+
+            }
+
+        }
+        
+    }
 
     function getCurrentBalance(address _address) internal view returns(uint256) {
         return votingEscrow.balanceOf(_address);
@@ -198,6 +219,7 @@ contract MobulaGovernor {
             0,
             Status.Pending
         );
+        emit CreatedProposal(msg.sender, id);
         nextProposalId++;
         return id;
     }
@@ -241,11 +263,15 @@ contract MobulaGovernor {
                 proposal.status = Status.Rejected;
             }
         }
+        emit Vote(msg.sender, _proposalId, _vote);
         numberVotes += 1;
+
+        checkClosing();
+
     }
 
     function getLiveProposals(uint256 top)
-    external
+    public
     view
     returns (Proposal[] memory)
     {

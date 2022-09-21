@@ -87,6 +87,10 @@ event Supply:
     prevSupply: uint256
     supply: uint256
 
+event NewVotingPower:
+    user: indexed(address)
+    newVotingPower: uint256
+
 
 WEEK: constant(uint256) = 7 * 86400  # all future times are rounded by week
 MAXTIME: constant(uint256) = 4 * 365 * 86400  # 4 years
@@ -141,8 +145,8 @@ def __init__(token_addr: address):
     assert _decimals <= 255
     self.decimals = _decimals
 
-    self.name = "Mobula"
-    self.symbol = "MOBL"
+    self.name = "Vote-escrowed MOBL"
+    self.symbol = "VeMOBL"
     self.version = "1.0"
 
     self.nextIdLock = 0
@@ -378,6 +382,77 @@ def _checkpoint(addr: address, old_locked: LockedBalance, new_locked: LockedBala
         u_new.blk = block.number
         self.user_point_history[addr][user_epoch] = u_new
 
+@internal
+@view
+def find_block_epoch(_block: uint256, max_epoch: uint256) -> uint256:
+    """
+    @notice Binary search to estimate timestamp for block number
+    @param _block Block to find
+    @param max_epoch Don't go beyond this epoch
+    @return Approximate timestamp for block
+    """
+    # Binary search
+    _min: uint256 = 0
+    _max: uint256 = max_epoch
+    for i in range(128):  # Will be always enough for 128-bit numbers
+        if _min >= _max:
+            break
+        _mid: uint256 = (_min + _max + 1) / 2
+        if self.point_history[_mid].blk <= _block:
+            _min = _mid
+        else:
+            _max = _mid - 1
+    return _min
+
+@internal
+@view
+def _balanceOfAt(addr: address, _block: uint256) -> uint256:
+    """
+    @notice Measure voting power of `addr` at block height `_block`
+    @dev Adheres to MiniMe `balanceOfAt` interface: https://github.com/Giveth/minime
+    @param addr User's wallet address
+    @param _block Block to calculate the voting power at
+    @return Voting power
+    """
+    # Copying and pasting totalSupply code because Vyper cannot pass by
+    # reference yet
+    assert _block <= block.number
+
+    # Binary search
+    _min: uint256 = 0
+    _max: uint256 = self.user_point_epoch[addr]
+    for i in range(128):  # Will be always enough for 128-bit numbers
+        if _min >= _max:
+            break
+        _mid: uint256 = (_min + _max + 1) / 2
+        if self.user_point_history[addr][_mid].blk <= _block:
+            _min = _mid
+        else:
+            _max = _mid - 1
+
+    upoint: Point = self.user_point_history[addr][_min]
+
+    max_epoch: uint256 = self.epoch
+    _epoch: uint256 = self.find_block_epoch(_block, max_epoch)
+    point_0: Point = self.point_history[_epoch]
+    d_block: uint256 = 0
+    d_t: uint256 = 0
+    if _epoch < max_epoch:
+        point_1: Point = self.point_history[_epoch + 1]
+        d_block = point_1.blk - point_0.blk
+        d_t = point_1.ts - point_0.ts
+    else:
+        d_block = block.number - point_0.blk
+        d_t = block.timestamp - point_0.ts
+    block_time: uint256 = point_0.ts
+    if d_block != 0:
+        block_time += d_t * (_block - point_0.blk) / d_block
+
+    upoint.bias -= upoint.slope * convert(block_time - upoint.ts, int128)
+    if upoint.bias >= 0:
+        return convert(upoint.bias, uint256)
+    else:
+        return 0
 
 @internal
 def _deposit_for(_addr: address, _value: uint256, unlock_time: uint256, locked_balance: LockedBalance, type: int128):
@@ -414,6 +489,7 @@ def _deposit_for(_addr: address, _value: uint256, unlock_time: uint256, locked_b
 
     log Deposit(_addr, _value, _locked.end, type, block.timestamp)
     log Supply(supply_before, supply_before + _value)
+    log NewVotingPower(_addr, self._balanceOfAt(_addr,block.number) - self._balanceOfAt(_addr,block.number - 1))
 
 
 @external
@@ -441,6 +517,7 @@ def deposit_for(_addr: address, _value: uint256):
     assert _locked.end > block.timestamp, "Cannot add to expired lock. Withdraw"
 
     self._deposit_for(_addr, _value, 0, self.locked[_addr], DEPOSIT_FOR_TYPE)
+    
 
 
 @external
@@ -466,6 +543,7 @@ def create_lock(_value: uint256, _unlock_time: uint256):
   
 
     self._deposit_for(msg.sender, _value, unlock_time, _locked, CREATE_LOCK_TYPE)
+    
 
 
 @external
@@ -538,27 +616,7 @@ def withdraw():
 # They measure the weights for the purpose of voting, so they don't represent
 # real coins.
 
-@internal
-@view
-def find_block_epoch(_block: uint256, max_epoch: uint256) -> uint256:
-    """
-    @notice Binary search to estimate timestamp for block number
-    @param _block Block to find
-    @param max_epoch Don't go beyond this epoch
-    @return Approximate timestamp for block
-    """
-    # Binary search
-    _min: uint256 = 0
-    _max: uint256 = max_epoch
-    for i in range(128):  # Will be always enough for 128-bit numbers
-        if _min >= _max:
-            break
-        _mid: uint256 = (_min + _max + 1) / 2
-        if self.point_history[_mid].blk <= _block:
-            _min = _mid
-        else:
-            _max = _mid - 1
-    return _min
+
 
 
 @external
@@ -580,6 +638,7 @@ def balanceOf(addr: address) -> uint256:
         if last_point.bias < 0:
             last_point.bias = 0
         return convert(last_point.bias, uint256)
+
 
 
 @external
