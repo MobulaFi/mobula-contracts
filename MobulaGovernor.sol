@@ -107,7 +107,7 @@ contract MobulaGovernor {
         Status status;
     }
 
-    event Vote(address indexed voter, uint indexed proposalId, VotingOptions vote);
+    event Vote(address indexed voter, uint indexed proposalId, VotingOptions vote, uint votingPower);
     event CreatedProposal(address indexed creator, uint indexed proposalId);
 
     mapping(uint256 => Proposal) public proposals;
@@ -263,7 +263,7 @@ contract MobulaGovernor {
                 proposal.status = Status.Rejected;
             }
         }
-        emit Vote(msg.sender, _proposalId, _vote);
+        emit Vote(msg.sender, _proposalId, _vote, votingEscrow.balanceOf(msg.sender));
         numberVotes += 1;
 
         checkClosing();
