@@ -20,7 +20,6 @@ contract API {
         uint256 utilityScore;
         uint256 socialScore;
         uint256 trustScore;
-        uint256 marketScore;
     }
 
     event NewListing(address indexed token, string ipfsHash);
