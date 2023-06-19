@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./interfaces/IAPI.sol";
 import "./interfaces/IERC20Extended.sol";
@@ -19,8 +20,7 @@ struct SubmitQuery {
     uint256 coeff;
 }
 
-contract ProtocolProxy is Initializable {
-    address public owner;
+contract ProtocolProxy is Initializable, Ownable2Step {
     uint256 public submitFloorPrice;
 
     uint256 public firstSortMaxVotes;
@@ -98,7 +98,7 @@ contract ProtocolProxy is Initializable {
         public
         initializer
     {
-        owner = _owner;
+        _transferOwnership(_owner);
         MOBL = IERC20(_mobulaTokenAddress);
     }
 
@@ -122,110 +122,98 @@ contract ProtocolProxy is Initializable {
 
     //Protocol variables updaters
 
-    function changeWhitelistedStable(address _stableAddress) external {
-        require(owner == msg.sender, "DAO Only");
+    function changeWhitelistedStable(address _stableAddress) external onlyOwner {
         whitelistedStable[_stableAddress] = !whitelistedStable[_stableAddress];
     }
 
-    function updateProtocolAPIAddress(address _protocolAPIAddress) external {
-        require(owner == msg.sender, "DAO Only");
+    function updateProtocolAPIAddress(address _protocolAPIAddress) external onlyOwner {
         ProtocolAPI = IAPI(_protocolAPIAddress);
     }
 
-    function updateSubmitFloorPrice(uint256 _submitFloorPrice) external {
-        require(owner == msg.sender, "DAO Only");
+    function updateSubmitFloorPrice(uint256 _submitFloorPrice) external onlyOwner {
         submitFloorPrice = _submitFloorPrice;
     }
 
-    function updateFirstSortMaxVotes(uint256 _firstSortMaxVotes) external {
-        require(owner == msg.sender, "DAO Only");
+    function updateFirstSortMaxVotes(uint256 _firstSortMaxVotes) external onlyOwner {
         firstSortMaxVotes = _firstSortMaxVotes;
     }
 
     function updateFinalDecisionMaxVotes(uint256 _finalDecisionMaxVotes)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only");
         finalDecisionMaxVotes = _finalDecisionMaxVotes;
     }
 
     function updateFirstSortValidationsNeeded(
         uint256 _firstSortValidationsNeeded
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         firstSortValidationsNeeded = _firstSortValidationsNeeded;
     }
 
     function updateFinalDecisionValidationsNeeded(
         uint256 _finalDecisionValidationsNeeded
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         finalDecisionValidationsNeeded = _finalDecisionValidationsNeeded;
     }
 
-    function updateTokensPerVote(uint256 _tokensPerVote) external {
-        require(owner == msg.sender, "DAO Only");
+    function updateTokensPerVote(uint256 _tokensPerVote) external onlyOwner {
         tokensPerVote = _tokensPerVote;
     }
 
     function updateMembersToPromoteToRankI(uint256 _membersToPromoteToRankI)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only");
         membersToPromoteToRankI = _membersToPromoteToRankI;
     }
 
     function updateMembersToPromoteToRankII(uint256 _membersToPromoteToRankII)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only");
         membersToPromoteToRankII = _membersToPromoteToRankII;
     }
 
     function updateMembersToDemoteFromRankI(uint256 _membersToDemoteToRankI)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only");
         membersToDemoteFromRankI = _membersToDemoteToRankI;
     }
 
     function updateMembersToDemoteFromRankII(uint256 _membersToDemoteToRankII)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only");
         membersToDemoteFromRankII = _membersToDemoteToRankII;
     }
 
     function updateVotesNeededToRankIPromotion(
         uint256 _votesNeededToRankIPromotion
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         votesNeededToRankIPromotion = _votesNeededToRankIPromotion;
     }
 
     function updateVotesNeededToRankIIPromotion(
         uint256 _votesNeededToRankIIPromotion
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         votesNeededToRankIIPromotion = _votesNeededToRankIIPromotion;
     }
 
     function updateVotesNeededToRankIDemotion(
         uint256 _votesNeededToRankIDemotion
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         votesNeededToRankIDemotion = _votesNeededToRankIDemotion;
     }
 
     function updateVotesNeededToRankIIDemotion(
         uint256 _votesNeededToRankIIDemotion
-    ) external {
-        require(owner == msg.sender, "DAO Only");
+    ) external onlyOwner {
         votesNeededToRankIIDemotion = _votesNeededToRankIIDemotion;
     }
 
-    function updateVoteCooldown(uint256 _voteCooldown) external {
-        require(owner == msg.sender, "DAO Only");
+    function updateVoteCooldown(uint256 _voteCooldown) external onlyOwner {
         voteCooldown = _voteCooldown;
     }
 
@@ -673,20 +661,17 @@ contract ProtocolProxy is Initializable {
 
     // Hierarchy management
 
-    function emergencyPromote(address promoted) external {
-        require(owner == msg.sender, "DAO Only");
+    function emergencyPromote(address promoted) external onlyOwner {
         require(rank[promoted] <= 1, "Impossible");
         rank[promoted]++;
     }
 
-    function emergencyDemote(address demoted) external {
-        require(owner == msg.sender, "DAO Only");
+    function emergencyDemote(address demoted) external onlyOwner {
         require(rank[demoted] >= 1, "Impossible");
         rank[demoted]--;
     }
 
-    function emergencyKillRequest(uint256 tokenId) external {
-        require(owner == msg.sender, "DAO Only");
+    function emergencyKillRequest(uint256 tokenId) external onlyOwner {
 
         for (uint256 i = 0; i < firstSortTokens.length; i++) {
             if (firstSortTokens[i].id == tokenId) {
@@ -767,15 +752,14 @@ contract ProtocolProxy is Initializable {
 
     // Funds management
 
-    function withdrawFunds(uint256 amount) external {
-        require(owner == msg.sender, "DAO Only.");
+    function withdrawFunds(uint256 amount) external onlyOwner {
         payable(msg.sender).transfer(amount);
     }
 
     function withdrawERC20Funds(uint256 amount, address contractAddress)
         external
+        onlyOwner
     {
-        require(owner == msg.sender, "DAO Only.");
         IERC20Extended paymentToken = IERC20Extended(contractAddress);
         paymentToken.transfer(msg.sender, amount);
     }
