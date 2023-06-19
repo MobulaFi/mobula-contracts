@@ -20,6 +20,19 @@ struct SubmitQuery {
     uint256 coeff;
 }
 
+/*
+    TODOs :
+    - [EDIT] Being able to edit a not validated listing
+        - Is it possible to update a validated listing ?
+    - [NO MIN] Being able to submit a listing without sending the minimum amount
+    - [METADATAS] Being able to add way more datas to a listing (ERC721 support and other needs)
+        - Probably handled on IPFS
+    - [MC] Being able to pay on another EVM chain
+    - [WL] Being able to whitelist a token -> no need to pay anything to be validated
+        - Paid by the protocol
+
+*/
+
 contract ProtocolProxy is Initializable, Ownable2Step {
     uint256 public submitFloorPrice;
 
@@ -236,6 +249,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             contractAddresses.length > 0,
             "You must submit at least one contract."
         );
+        // TODO : WL and NO MIN
         require(
             paymentAmount >= submitFloorPrice,
             "You must pay the required amount."
@@ -243,11 +257,13 @@ contract ProtocolProxy is Initializable, Ownable2Step {
 
         IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
 
+        // TODO : WL and NO MIN
         require(
             paymentToken.allowance(msg.sender, address(this)) >=
                 paymentAmount * 10**paymentToken.decimals(),
             "You must approve the required amount."
         );
+        // TODO : WL and NO MIN
         require(
             paymentToken.transferFrom(
                 msg.sender,
@@ -257,6 +273,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             "Payment failed."
         );
 
+        // TODO : Can cost a lot in gas + now possible to add same contract address for several tokens
         for (uint256 i = 0; i < firstSortTokens.length; i++) {
             for (
                 uint256 j = 0;
@@ -273,6 +290,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             }
         }
 
+        // TODO : Can cost a lot in gas + now possible to add same contract address for several tokens
         for (uint256 i = 0; i < finalValidationTokens.length; i++) {
             for (
                 uint256 j = 0;
@@ -316,6 +334,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         emit DataSubmitted(submittedToken);
     }
 
+    // TODO : EDIT
     function firstSortVote(
         uint256 tokenId,
         bool validate,
@@ -334,6 +353,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             !firstSortVotes[msg.sender][tokenId],
             "You cannot vote twice for the same token."
         );
+        // QUESTION : What is this feature ?
         require(
             block.timestamp >
                 firstSortTokens[indexOfFirstSortTokens[tokenId]].lastUpdate +
@@ -366,6 +386,8 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             trustScore
         );
 
+        // TODO : store indexOfFirstSortTokens in memory
+        // QUESTION : What if token is in finalValidationTokens ?
         if (
             tokenFirstValidations[tokenId].length +
                 tokenFirstRejections[tokenId].length >=
@@ -391,6 +413,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                 );
             }
 
+            // TODO : Probably simplify the pop
             firstSortTokens[indexOfFirstSortTokens[tokenId]] = firstSortTokens[
                 firstSortTokens.length - 1
             ];
@@ -409,6 +432,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         uint256 trustScore
     ) external {
         require(rank[msg.sender] >= 2, "You must be Rank II to vote.");
+        // TODO : Remove ? as it is already checked in firstSortVote || Or probably check the fact that it's added in other way
         require(
             finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                 .contractAddresses
@@ -422,6 +446,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
 
         finalDecisionVotes[msg.sender][tokenId] = true;
 
+        // QUESTION : Rank II can submit score twice ? (already possible in firstSortVote)
         tokenUtilityScore[tokenId].push(utilityScore);
         tokenSocialScore[tokenId].push(socialScore);
         tokenTrustScore[tokenId].push(trustScore);
@@ -441,6 +466,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             trustScore
         );
 
+        // TODO : refacto needed
         if (
             tokenFinalValidations[tokenId].length +
                 tokenFinalRejections[tokenId].length >=
