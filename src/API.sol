@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-contract API {
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
+
+error NotProtocolOrOwner();
+
+contract API is Ownable2Step {
     address public protocol;
-    address public owner;
 
     mapping(address => string) public staticData;
     mapping(address => uint256) public tokenAssetId;
@@ -26,9 +29,16 @@ contract API {
 
     event NewAssetListing(Token token);
 
+    modifier onlyProtocolAndOwner() {
+        if (protocol != msg.sender && owner() != msg.sender) {
+            revert NotProtocolOrOwner();
+        }
+        _;
+    }
+
     constructor(address _protocol, address _owner) {
         protocol = _protocol;
-        owner = _owner;
+        _transferOwnership(_owner);
     }
 
     function getAllAssets() external view returns (Token[] memory) {
@@ -39,21 +49,13 @@ contract API {
         address token,
         string memory ipfsHash,
         uint256 assetId
-    ) external {
-        require(
-            protocol == msg.sender || owner == msg.sender,
-            "Only the DAO or the Protocol can add data."
-        );
+    ) external onlyProtocolAndOwner {
         staticData[token] = ipfsHash;
         tokenAssetId[token] = assetId;
         emit NewListing(token, ipfsHash);
     }
 
-    function addAssetData(Token memory token) external {
-        require(
-            protocol == msg.sender || owner == msg.sender,
-            "Only the DAO or the Protocol can add data."
-        );
+    function addAssetData(Token memory token) external onlyProtocolAndOwner {
         assets.push(token);
         assetById[token.id] = token;
 
@@ -64,16 +66,11 @@ contract API {
         emit NewAssetListing(token);
     }
 
-    function removeStaticData(address token) external {
-        require(owner == msg.sender);
+    function removeStaticData(address token) external onlyOwner {
         delete staticData[token];
     }
 
-    function setProtocolAddress(address _protocol) external {
-        require(
-            owner == msg.sender,
-            "Only the DAO can modify the Protocol address."
-        );
+    function setProtocolAddress(address _protocol) external onlyOwner {
         protocol = _protocol;
     }
 }
