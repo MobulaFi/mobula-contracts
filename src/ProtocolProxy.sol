@@ -231,7 +231,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
     }
 
     //Protocol data processing
-
+    // TODO : Find a way to differentiate tokens (other than contract addresses)
     function submitIPFS(
         address[] memory contractAddresses,
         address[] memory totalSupplyAddresses,
@@ -264,6 +264,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             "You must approve the required amount."
         );
         // TODO : WL and NO MIN
+        // Retrieve submitter payment for this token
         require(
             paymentToken.transferFrom(
                 msg.sender,
@@ -274,6 +275,8 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         );
 
         // TODO : Can cost a lot in gas + now possible to add same contract address for several tokens
+        // -> Not so much in the end if there are not too many pending tokens -> but no check with API's token
+        // Check that token's contract addresses aren't already linked with another 'pending' token (to remove)
         for (uint256 i = 0; i < firstSortTokens.length; i++) {
             for (
                 uint256 j = 0;
@@ -291,6 +294,8 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         }
 
         // TODO : Can cost a lot in gas + now possible to add same contract address for several tokens
+        // -> Not so much in the end if there are not too many validated tokens -> but no check with API's token
+        // Check that token's contract addresses aren't already linked with another 'validated' token (to remove)
         for (uint256 i = 0; i < finalValidationTokens.length; i++) {
             for (
                 uint256 j = 0;
@@ -325,9 +330,9 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             0,
             0,
             0,
-            (paymentAmount * 1000) / submitFloorPrice
+            (paymentAmount * 1000) / submitFloorPrice // If paymentAmount == submitFloorPrice -> coeff == 1000
         );
-
+        // Add token as pending
         submittedTokens.push(submittedToken);
         indexOfFirstSortTokens[submittedToken.id] = firstSortTokens.length;
         firstSortTokens.push(submittedToken);
@@ -335,6 +340,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
     }
 
     // TODO : EDIT
+    // Method used by Rank I+ users to validate (or not) a token + give scores
     function firstSortVote(
         uint256 tokenId,
         bool validate,
@@ -365,12 +371,13 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             "Scores must be between 0 and 5."
         );
 
+        // Add voter's scores for this token
         tokenUtilityScore[tokenId].push(utilityScore);
         tokenSocialScore[tokenId].push(socialScore);
         tokenTrustScore[tokenId].push(trustScore);
-
+        // Save that this user voted
         firstSortVotes[msg.sender][tokenId] = true;
-
+        // Add user in Validations or Rejections for this token
         if (validate) {
             tokenFirstValidations[tokenId].push(msg.sender);
         } else {
@@ -387,16 +394,20 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         );
 
         // TODO : store indexOfFirstSortTokens in memory
-        // QUESTION : What if token is in finalValidationTokens ?
+        // If token is in finalValidationTokens -> removed from firstSortTokens -> unreachable
+        // If token received enough votes (validations and rejections combined)
         if (
             tokenFirstValidations[tokenId].length +
                 tokenFirstRejections[tokenId].length >=
             firstSortMaxVotes
         ) {
+            // Relation between firstSortMaxVotes and firstSortValidationsNeeded ? -> thresold for the token to be validated/rejected
+            // If there are enough validations -> token first validation
             if (
                 tokenFirstValidations[tokenId].length >=
                 firstSortValidationsNeeded
             ) {
+                // Add token in finalValidationTokens
                 indexOfFinalValidationTokens[tokenId] = finalValidationTokens
                     .length;
                 finalValidationTokens.push(
@@ -406,6 +417,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     firstSortTokens[indexOfFirstSortTokens[tokenId]],
                     tokenFirstValidations[tokenId].length
                 );
+            // If there are not enough validations (thus enough rejections)
             } else {
                 emit FirstSortRejected(
                     firstSortTokens[indexOfFirstSortTokens[tokenId]],
@@ -413,14 +425,18 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                 );
             }
 
-            // TODO : Probably simplify the pop
+            // TODO : Probably simplify the readability of the pop
+            // Replace token in firstSortTokens by the last token of firstSortTokens
             firstSortTokens[indexOfFirstSortTokens[tokenId]] = firstSortTokens[
                 firstSortTokens.length - 1
             ];
+            // Remove the last token from firstSortTokens (duplicate)
             indexOfFirstSortTokens[
                 firstSortTokens[firstSortTokens.length - 1].id
             ] = indexOfFirstSortTokens[tokenId];
             firstSortTokens.pop();
+            // -> After it receives enough votes, remove the token from firstSortTokens
+            // What happens to indexOfFirstSortTokens[tokenId] ?
         }
     }
 
@@ -432,7 +448,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         uint256 trustScore
     ) external {
         require(rank[msg.sender] >= 2, "You must be Rank II to vote.");
-        // TODO : Remove ? as it is already checked in firstSortVote || Or probably check the fact that it's added in other way
+        // Is the token validated by rank I users ? (in finalValidationTokens)
         require(
             finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                 .contractAddresses
@@ -443,19 +459,21 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             !finalDecisionVotes[msg.sender][tokenId],
             "You cannot vote twice for the same token."
         );
-
+        // Save that this user voted
         finalDecisionVotes[msg.sender][tokenId] = true;
 
-        // QUESTION : Rank II can submit score twice ? (already possible in firstSortVote)
+        // QUESTION : Rank II can submit score twice ? (already possible in firstSortVote) -> can vote for and against ?
         tokenUtilityScore[tokenId].push(utilityScore);
         tokenSocialScore[tokenId].push(socialScore);
         tokenTrustScore[tokenId].push(trustScore);
-
+        // Add user in FinalValidations or FinalRejections for this token
         if (validate) {
             tokenFinalValidations[tokenId].push(msg.sender);
         } else {
             tokenFinalRejections[tokenId].push(msg.sender);
         }
+
+        // TODO : Save in memory indexOfFinalValidationTokens[tokenId] ?
 
         emit FinalValidationVote(
             finalValidationTokens[indexOfFinalValidationTokens[tokenId]],
@@ -466,12 +484,15 @@ contract ProtocolProxy is Initializable, Ownable2Step {
             trustScore
         );
 
-        // TODO : refacto needed
+        // TODO : refacto needed -> explode in several methods
+        // If token received enough 'final' votes (validations and rejections combined)
         if (
             tokenFinalValidations[tokenId].length +
                 tokenFinalRejections[tokenId].length >=
             finalDecisionMaxVotes
         ) {
+            // Relation between finalDecisionMaxVotes and finalDecisionValidationsNeeded ? -> thresold for the token to be final validated/rejected
+            // If there are enough final validations -> token 'final' validation
             if (
                 tokenFinalValidations[tokenId].length >=
                 finalDecisionValidationsNeeded
@@ -481,10 +502,14 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFirstValidations[tokenId].length;
                     i++
                 ) {
+                    // tokenFirstValidations[tokenId][i] = voter address whom validated this token
+                    // Remove current voter's (i) validation vote for this token from firstSortVotes
                     delete firstSortVotes[tokenFirstValidations[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's goodFirstVotes count
                     goodFirstVotes[tokenFirstValidations[tokenId][i]]++;
+                    // Increment voter's rewards with token's coeff
                     owedRewards[
                         tokenFirstValidations[tokenId][i]
                     ] += finalValidationTokens[
@@ -497,9 +522,12 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFirstRejections[tokenId].length;
                     i++
                 ) {
+                    // tokenFirstRejections[tokenId][i] = voter address whom rejected this token
+                    // Remove current voter's (i) rejection vote for this token from firstSortVotes
                     delete firstSortVotes[tokenFirstRejections[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's badFirstVotes count
                     badFirstVotes[tokenFirstRejections[tokenId][i]]++;
                 }
 
@@ -509,10 +537,15 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFinalValidations[tokenId].length;
                     i++
                 ) {
+                    // tokenFinalValidations[tokenId][i] = voter address whom 'final' validated this token
+                    // Remove current voter's (i) final validation vote for this token from finalDecisionVotes
                     delete finalDecisionVotes[
                         tokenFinalValidations[tokenId][i]
                     ][tokenId];
+                    // Increment voter's goodFinalVotes count
                     goodFinalVotes[tokenFinalValidations[tokenId][i]]++;
+                    // Increment voter's rewards with token's coeff * 2
+                    // BUG : tokenFinalValidations[tokenId][i] instead of tokenFirstValidations[tokenId][i] ?
                     owedRewards[tokenFirstValidations[tokenId][i]] +=
                         finalValidationTokens[
                             indexOfFinalValidationTokens[tokenId]
@@ -526,12 +559,16 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFinalRejections[tokenId].length;
                     i++
                 ) {
+                    // tokenFinalRejections[tokenId][i] = voter address whom 'final' rejected this token
+                    // Remove current voter's (i) final rejection vote for this token from finalDecisionVotes
                     delete finalDecisionVotes[tokenFinalRejections[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's badFinalVotes count
                     badFinalVotes[tokenFinalRejections[tokenId][i]]++;
                 }
 
+                // Calculate token utility score average
                 uint256 tokenUtilityScoreAverage;
 
                 for (
@@ -544,6 +581,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
 
                 tokenUtilityScoreAverage /= tokenUtilityScore[tokenId].length;
 
+                // Calculate token social score average
                 uint256 tokenSocialScoreAverage;
 
                 for (uint256 i = 0; i < tokenSocialScore[tokenId].length; i++) {
@@ -552,6 +590,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
 
                 tokenSocialScoreAverage /= tokenSocialScore[tokenId].length;
 
+                // Calculate token trust score average
                 uint256 tokenTrustScoreAverage;
 
                 for (uint256 i = 0; i < tokenTrustScore[tokenId].length; i++) {
@@ -559,14 +598,14 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                 }
 
                 tokenTrustScoreAverage /= tokenTrustScore[tokenId].length;
-
+                // Save token's scores
                 finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                     .utilityScore = tokenUtilityScoreAverage;
                 finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                     .socialScore = tokenSocialScoreAverage;
                 finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                     .trustScore = tokenTrustScoreAverage;
-
+                // Craft API Token
                 IAPI.Token memory token = IAPI.Token(
                     finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                         .ipfsHash,
@@ -587,7 +626,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     finalValidationTokens[indexOfFinalValidationTokens[tokenId]]
                         .trustScore
                 );
-
+                // Save token in API
                 ProtocolAPI.addAssetData(token);
 
                 emit FinalDecisionValidated(
@@ -596,6 +635,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     ],
                     tokenFinalValidations[tokenId].length
                 );
+            // If there are not enough final validations (thus enough final rejections)
             } else {
                 // Punish wrong first voters
                 for (
@@ -603,9 +643,12 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFirstValidations[tokenId].length;
                     i++
                 ) {
+                    // tokenFirstValidations[tokenId][i] = voter address whom validated this token
+                    // Remove current voter's (i) validation vote for this token from firstSortVotes
                     delete firstSortVotes[tokenFirstValidations[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's badFirstVotes count
                     badFirstVotes[tokenFirstValidations[tokenId][i]]++;
                 }
 
@@ -615,10 +658,15 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFirstRejections[tokenId].length;
                     i++
                 ) {
+                    // tokenFirstRejections[tokenId][i] = voter address whom rejected this token
+                    // Remove current voter's (i) rejection vote for this token from firstSortVotes
                     delete firstSortVotes[tokenFirstRejections[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's goodFirstVotes count
                     goodFirstVotes[tokenFirstRejections[tokenId][i]]++;
+                    // Increment voter's rewards with token's coeff
+                    // BUG : tokenFirstRejections[tokenId][i] instead of tokenFirstValidations[tokenId][i] ?
                     owedRewards[
                         tokenFirstValidations[tokenId][i]
                     ] += finalValidationTokens[
@@ -632,9 +680,12 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFinalValidations[tokenId].length;
                     i++
                 ) {
+                    // tokenFinalValidations[tokenId][i] = voter address whom validated this token
+                    // Remove current voter's (i) validation vote for this token from finalDecisionVotes
                     delete finalDecisionVotes[
                         tokenFinalValidations[tokenId][i]
                     ][tokenId];
+                    // Increment voter's badFinalVotes count
                     badFinalVotes[tokenFinalValidations[tokenId][i]]++;
                 }
 
@@ -644,10 +695,15 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     i < tokenFinalRejections[tokenId].length;
                     i++
                 ) {
+                    // tokenFinalRejections[tokenId][i] = voter address whom rejected this token
+                    // Remove current voter's (i) rejection vote for this token from finalDecisionVotes
                     delete finalDecisionVotes[tokenFinalRejections[tokenId][i]][
                         tokenId
                     ];
+                    // Increment voter's goodFinalVotes count
                     goodFinalVotes[tokenFinalRejections[tokenId][i]]++;
+                    // Increment voter's rewards with token's coeff*2
+                    // BUG : tokenFinalRejections[tokenId][i] instead of tokenFirstValidations[tokenId][i] ?
                     owedRewards[tokenFirstValidations[tokenId][i]] +=
                         finalValidationTokens[
                             indexOfFinalValidationTokens[tokenId]
@@ -662,45 +718,58 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                     tokenFinalValidations[tokenId].length
                 );
             }
-
+            // TODO : Probably simplify the readability of the pop
+            // Replace token in finalValidationTokens by the last token of finalValidationTokens
             finalValidationTokens[
                 indexOfFinalValidationTokens[tokenId]
             ] = finalValidationTokens[finalValidationTokens.length - 1];
+            // Remove the last token from finalValidationTokens (duplicate)
             indexOfFinalValidationTokens[
                 finalValidationTokens[finalValidationTokens.length - 1].id
             ] = indexOfFinalValidationTokens[tokenId];
             finalValidationTokens.pop();
+            // -> After it receives enough votes, remove the token from finalValidationTokens
+            // What happens to indexOfFinalValidationTokens[tokenId] ?
 
+            // Remove token's scores
             delete tokenUtilityScore[tokenId];
             delete tokenSocialScore[tokenId];
             delete tokenTrustScore[tokenId];
         }
     }
 
+    // Claim personal owed rewards
+    // TODO : Being able to claim for anybody ?
     function claimRewards() external {
         uint256 amountToPay = (owedRewards[msg.sender] -
             paidRewards[msg.sender]) * tokensPerVote;
         require(amountToPay > 0, "Nothing to claim.");
         paidRewards[msg.sender] = owedRewards[msg.sender];
+        // QUESTION : Why don't we reset owedRewards (but keep stacking paidRewards)
         MOBL.transfer(msg.sender, amountToPay / 1000);
+        // QUESTION : MOBL not divisible ?
     }
 
     // Hierarchy management
-
+    // TODO : Add events -> really hard to track ranked users otherwise
+    // TODO : Update promoteVotes, membersToDemoteFromRankI, membersToDemoteFromRankII
+    // Increment user's rank
     function emergencyPromote(address promoted) external onlyOwner {
         require(rank[promoted] <= 1, "Impossible");
         rank[promoted]++;
     }
-
+    // Decrement user's rank
     function emergencyDemote(address demoted) external onlyOwner {
         require(rank[demoted] >= 1, "Impossible");
         rank[demoted]--;
     }
 
+    // Remove a token from validation process
     function emergencyKillRequest(uint256 tokenId) external onlyOwner {
 
         for (uint256 i = 0; i < firstSortTokens.length; i++) {
             if (firstSortTokens[i].id == tokenId) {
+                // Remove token from firstSortTokens (refacto this)
                 firstSortTokens[i] = firstSortTokens[
                     firstSortTokens.length - 1
                 ];
@@ -714,6 +783,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
 
         for (uint256 i = 0; i < finalValidationTokens.length; i++) {
             if (finalValidationTokens[i].id == tokenId) {
+                // Remove token from firstSortTokens (refacto this)
                 finalValidationTokens[i] = finalValidationTokens[
                     finalValidationTokens.length - 1
                 ];
@@ -726,6 +796,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         }
     }
 
+    // Method allowing a rank II user to vote for a promote for a rank I user or below
     function promote(address promoted) external {
         require(rank[msg.sender] >= 2, "You must be Rank II to promote.");
         require(rank[promoted] <= 1, "Impossible");
@@ -751,10 +822,12 @@ contract ProtocolProxy is Initializable, Ownable2Step {
         }
     }
 
+    // Method allowing a rank II user to vote for a demote for a rank II or I user
     function demote(address demoted) external {
         require(rank[msg.sender] >= 2, "You must be Rank II demote.");
         require(rank[demoted] >= 1, "Impossible");
 
+        // BUG : Condition impossible
         if (rank[demoted] == 0) {
             require(membersToDemoteFromRankI > 0, "No demotion yet.");
             demoteVotes[demoted]++;
@@ -765,6 +838,7 @@ contract ProtocolProxy is Initializable, Ownable2Step {
                 rank[demoted]++;
             }
         } else {
+            // BUG : As previous condition is impossible -> this lead to bugs when demoting rank I
             require(membersToDemoteFromRankII > 0, "No demotion yet.");
             demoteVotes[demoted]++;
 
@@ -777,11 +851,14 @@ contract ProtocolProxy is Initializable, Ownable2Step {
     }
 
     // Funds management
-
+    // Withdraw ETH amount to owner
+    // TODO : Use msg.sender.call to withdraw funds + allow withdraw to another recipient + checks (amount + not fail)
     function withdrawFunds(uint256 amount) external onlyOwner {
         payable(msg.sender).transfer(amount);
     }
 
+    // Withdraw ERC20 (contractAddress) amount to owner
+    // TODO : Allow withdraw to another recipient + checks
     function withdrawERC20Funds(uint256 amount, address contractAddress)
         external
         onlyOwner
