@@ -3,10 +3,10 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-error NotProtocolOrOwner();
-
 contract API is Ownable2Step {
     address public protocol;
+
+    error NotProtocolOrOwner(address account);
 
     mapping(address => string) public staticData;
     mapping(address => uint256) public tokenAssetId;
@@ -31,7 +31,7 @@ contract API is Ownable2Step {
 
     modifier onlyProtocolAndOwner() {
         if (protocol != msg.sender && owner() != msg.sender) {
-            revert NotProtocolOrOwner();
+            revert NotProtocolOrOwner(msg.sender);
         }
         _;
     }
