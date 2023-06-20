@@ -50,12 +50,13 @@ struct SubmitQuery {
 
     IDEAS :
         - Could we store tokens in a single mapping, and only store their ID in special array depending of their status ?
-            - 
+            - submittedTokens
         
     QUESTIONS :
         - Should we redeploy API.sol ?
             - It would need to migrate all tokens
             - If so, we should create a migrate method this time
+        - Does the backend adaptability should be accounted in these tasks ?
 */
 
 contract ProtocolProxy is Initializable, Ownable2Step {
