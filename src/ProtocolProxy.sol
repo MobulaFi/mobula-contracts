@@ -28,11 +28,16 @@ struct SubmitQuery {
         - Could a token be updated in firstSort and finalValidation ? (this could/should probably reset all votes)
         - SubmitQuery should be tied to a user -> the only user being able to update it
         - Add method to update token
+
+        - -> User can update only if voters asked for it
+
     - [NO MIN] Being able to submit a listing without sending the minimum amount
         - New state before firstSort (where a payment is not needed)
         - Add method to send payment for a token
     - [METADATAS] Being able to add way more datas to a listing (ERC721 support and other needs)
         - Probably handled on IPFS -> that would solve the problem
+
+        - REMOVE arrays addresses
     - [MC] Being able to pay on another EVM chain
         - Contract on Polygon won't be called by the submitter
         - Create methods only callable by Axelar -> submitter as param
@@ -40,6 +45,7 @@ struct SubmitQuery {
         - Have to send gas money for each tx
             - How to prevent spam ?
             - Do we pay gas for users ?
+                - No, at first
         - https://docs.axelar.dev/dev/general-message-passing/examples
     - [WL] Being able to whitelist a token -> no need to pay anything to be validated
         - Paid by the protocol
@@ -47,6 +53,8 @@ struct SubmitQuery {
             - Or is it on top of NO MIN ? -> can be paid later by the protocol
         - Or should we add a new status 'payment needed' ?
             - Could it be voted even in this state ?
+
+        - SOLUTION : WL of a msg.sender (bool)
 
     IDEAS :
         - Could we store tokens in a single mapping, and only store their ID in special array depending of their status ?

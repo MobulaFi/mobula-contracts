@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
+// TODO : Use TokenStruct instead
+
 contract API is Ownable2Step {
     address public protocol;
 
@@ -15,10 +17,7 @@ contract API is Ownable2Step {
 
     struct Token {
         string ipfsHash;
-        address[] contractAddresses;
         uint256 id;
-        address[] totalSupply;
-        address[] excludedFromCirculation;
         uint256 lastUpdate;
         uint256 utilityScore;
         uint256 socialScore;
