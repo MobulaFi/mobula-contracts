@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 error InvalidPaymentToken(address paymentToken);
 error TokenPaymentFailed(address paymentToken, uint256 amount);
+error TokenNotFound(uint256 tokenId);
+error InvalidPaymentAmount();
 error InsufficientProtocolBalance(uint256 protocolBalance, uint256 amountToWithdraw);
 error NothingToClaim(address claimer);
 error ETHTransferFailed(address recipient);

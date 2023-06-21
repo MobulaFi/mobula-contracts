@@ -8,7 +8,7 @@ import "./interfaces/IAPI.sol";
 import "./interfaces/IERC20Extended.sol";
 
 import "./lib/ProtocolErrors.sol";
-import "./lib/TokenStruct.sol";
+import "./lib/TokenStructs.sol";
 
 /*
     SUGGESTIONS :
@@ -41,21 +41,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         _;
     }
 
-    /* Enums */
-    /**
-     * @dev Enum to define Token status
-     * @custom:Pool Initial Token status 
-     * @custom:FirstSort RankI users can vote for this Token
-     * @custom:FinalValidation RankII users can vote to validate this Token
-     * @custom:Validated Token has been validated and listed
-     */
-    enum TokenStatus {
-        Pool,
-        FirstSort,
-        FinalValidation,
-        Validated
-    }
-
     /* Protocol variables */
     /**
      * @dev whitelistedStable Does an ERC20 stablecoin is whitelisted as listing payment
@@ -78,13 +63,9 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     uint256 public submitFloorPrice;
 
     /**
-     * @dev tokens Tokens submitted
-     * @dev tokenStatus Token status
-     * @dev tokenCoeff Token coeff
+     * @dev tokenListings All Token Listings
      */
-    Token[] public tokens;
-    mapping(uint256 => TokenStatus) public tokenStatus;
-    mapping(uint256 => uint256) public tokenCoeff;
+    TokenListing[] public tokenListings;
 
     /**
      * @dev firstSortMaxVotes Maximum votes count for first validation
@@ -152,7 +133,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     address private mobulaToken;
 
     /* Events */
-    event TokenSubmitted(address submitter, Token token);
+    event TokenListingSubmitted(address submitter, TokenListing tokenListing);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event UserPromoted(address indexed promoted, uint256 newRank);
@@ -172,17 +153,16 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     
     /* Users methods */
 
-    // TODO : Add submitToken + add updateToken
+    // TODO : add updateToken
 
     /**
      * @dev Allows a user to submit a Token for validation
      * @param ipfsHash IPFS hash of the Token
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
-     * @param assetId Asset ID
      */
     // QUESTIONS : Can somebody pay with MATIC ? Why does the user can chose assetId ?
-    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, uint256 assetId)
+    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount)
         external
     {
         uint256 coeff;
@@ -191,37 +171,26 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (whitelistedSubmitter[msg.sender]) {
             coeff = PAYMENT_COEFF;
         } else if (paymentAmount != 0) {
-            // TODO : Create an internal method that can be used in topUpToken() too
-            if (!whitelistedStable[paymentTokenAddress]) {
-                revert InvalidPaymentToken(paymentTokenAddress);
-            }
-
-            IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
-            uint256 amount = paymentAmount * 10**paymentToken.decimals();
-            bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
-
-            if (!success) {
-                revert TokenPaymentFailed(paymentTokenAddress, amount);
-            }
-
-            coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
+            coeff = _payment(paymentTokenAddress, paymentAmount);
         }
-
-        Token memory token;
-        token.ipfsHash = ipfsHash;
-        token.lastUpdate = block.timestamp;
-
-        tokens.push(token);
-        token.id = tokens.length - 1;
 
         if (coeff >= PAYMENT_COEFF) {
             status = TokenStatus.FirstSort;
         }
 
-        tokenStatus[token.id] = status;
-        tokenCoeff[token.id] = coeff;
+        Token memory token;
+        token.ipfsHash = ipfsHash;
+        token.lastUpdate = block.timestamp;
+        
+        TokenListing memory listing;
+        listing.token = token;
+        listing.coeff = coeff;
+        listing.status = status;
 
-        emit TokenSubmitted(msg.sender, token);
+        tokenListings.push(listing);
+        token.id = tokenListings.length - 1;
+
+        emit TokenListingSubmitted(msg.sender, listing);
     }
 
     /**
@@ -231,7 +200,18 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param paymentAmount Amount to be paid (without decimals)
      */
     function topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external {
-        // TODO
+        if (tokenId >= tokenListings.length) {
+            revert TokenNotFound(tokenId);
+        }
+        if (paymentAmount == 0) {
+            revert InvalidPaymentAmount();
+        }
+
+        tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
+
+        if (tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
+            tokenListings[tokenId].status = TokenStatus.FirstSort;
+        }
     }
 
     /**
@@ -528,6 +508,28 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     }
 
     /* Internal Methods */
+
+    /**
+     * @dev Make the payment from user
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     * @return coeff Coeff to add to the listing
+     */
+    function _payment(address paymentTokenAddress, uint256 paymentAmount) internal returns (uint256 coeff) {
+        if (!whitelistedStable[paymentTokenAddress]) {
+            revert InvalidPaymentToken(paymentTokenAddress);
+        }
+
+        IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
+        uint256 amount = paymentAmount * 10**paymentToken.decimals();
+        bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
+
+        if (!success) {
+            revert TokenPaymentFailed(paymentTokenAddress, amount);
+        }
+
+        coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
+    }
 
     /**
      * @dev Increase user rank
