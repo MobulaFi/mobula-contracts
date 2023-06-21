@@ -13,6 +13,27 @@ import "./lib/TokenStruct.sol";
 
 contract TokensProtocolProxy is Initializable, Ownable2Step {
 
+    /* Modifiers */
+    /**
+     * @dev Modifier to limit function calls to Rank I or higher
+     */
+    modifier onlyRanked() {
+        if (rank[msg.sender] == 0) {
+            revert InvalidUserRank(rank[msg.sender], 1);
+        }
+        _;
+    }
+
+    /**
+     * @dev Modifier to limit function calls to Rank II
+     */
+    modifier onlyRankII() {
+        if (rank[msg.sender] < 2) {
+            revert InvalidUserRank(rank[msg.sender], 2);
+        }
+        _;
+    }
+
     /* Protocol variables */
     /**
      * @dev whitelistedStable Does an ERC20 stablecoin is whitelisted as listing payment
@@ -64,12 +85,35 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     uint256 public voteCooldown;
 
     /**
+     * @dev rank User rank
+     * @dev promoteVotes Amount of votes for User promotion
+     * @dev demoteVotes Amount of votes for User demotion
+     * @dev goodFirstVotes Amount of User's 'good' first votes
+     * @dev badFirstVotes Amount of User's 'bad' first votes
+     * @dev goodFinalVotes Amount of User's 'good' final votes
+     * @dev badFinalVotes Amount of User's 'bad' final votes
+     * @dev owedRewards Amount of User's owed rewards
+     * @dev paidRewards Amount of User's paid rewards
+     */
+    mapping(address => uint256) public rank;
+    mapping(address => uint256) public promoteVotes;
+    mapping(address => uint256) public demoteVotes;
+    mapping(address => uint256) public goodFirstVotes;
+    mapping(address => uint256) public badFirstVotes;
+    mapping(address => uint256) public goodFinalVotes;
+    mapping(address => uint256) public badFinalVotes;
+    mapping(address => uint256) public owedRewards;
+    mapping(address => uint256) public paidRewards;
+
+    /**
      * @dev mobulaToken MOBL token address
      */
     address mobulaToken;
 
     /* Events */
     event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event UserPromoted(address indexed promoted, uint256 newRank);
+    event UserDemoted(address indexed demoted, uint256 newRank);
 
     function initialize(address _owner, address _mobulaToken)
         public
@@ -92,6 +136,138 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /* Votes */
 
     // TODO : Add votes methods + create modifiers (onlyRanked, onlyRankII...)
+
+    /* Hierarchy Management */
+
+    /**
+     * @dev Allows a Rank II user to vote for a promotion for a Rank I user or below
+     * @param promoted Address of the user
+     */
+    function promote(address promoted) external onlyRankII {
+        uint256 rankPromoted = rank[promoted];
+        if (rankPromoted > 1) {
+            revert RankPromotionImpossible(rankPromoted, 1);
+        }
+
+        if (rankPromoted == 0) {
+            if (membersToPromoteToRankI == 0) {
+                revert NoPromotionYet(1);
+            }
+            ++promoteVotes[promoted];
+
+            if (promoteVotes[promoted] == votesNeededToRankIPromotion) {
+                --membersToPromoteToRankI;
+                _promote(promoted);
+            }
+        } else {
+            if (membersToPromoteToRankII == 0) {
+                revert NoPromotionYet(2);
+            }
+            ++promoteVotes[promoted];
+
+            if (promoteVotes[promoted] == votesNeededToRankIIPromotion) {
+                --membersToPromoteToRankII;
+                _promote(promoted);
+            }
+        }
+    }
+
+    /**
+     * @dev Allows a Rank II user to vote for a demotion for a Rank II user or below
+     * @param demoted Address of the user
+     */
+    function demote(address demoted) external onlyRankII {
+        uint256 rankDemoted = rank[demoted];
+        if (rankDemoted == 0) {
+            revert RankDemotionImpossible(rankDemoted, 1);
+        }
+
+        if (rankDemoted == 1) {
+            if (membersToDemoteFromRankI == 0) {
+                revert NoDemotionYet(1);
+            }
+            ++demoteVotes[demoted];
+
+            if (demoteVotes[demoted] == votesNeededToRankIDemotion) {
+                --membersToDemoteFromRankI;
+                _demote(demoted);
+            }
+        } else {
+            if (membersToDemoteFromRankII == 0) {
+                revert NoDemotionYet(2);
+            }
+            ++demoteVotes[demoted];
+
+            if (demoteVotes[demoted] == votesNeededToRankIIDemotion) {
+                --membersToDemoteFromRankII;
+                _demote(demoted);
+            }
+        }
+    }
+
+    /* Emergency Methods */
+
+    /**
+     * @dev Allows the owner to promote a user
+     * @param promoted Address of the user
+     */
+    function emergencyPromote(address promoted) external onlyOwner {
+        uint256 rankPromoted = rank[promoted];
+        if (rankPromoted > 1) {
+            revert RankPromotionImpossible(rankPromoted, 1);
+        }
+        // TODO : Update membersToPromoteToRankI or membersToPromoteToRankII ?
+        _promote(promoted);
+    }
+
+    /**
+     * @dev Allows the owner to demote a user
+     * @param demoted Address of the user
+     */
+    function emergencyDemote(address demoted) external onlyOwner {
+        uint256 rankDemoted = rank[demoted];
+        if (rankDemoted == 0) {
+            revert RankDemotionImpossible(rankDemoted, 1);
+        }
+        // TODO : Update membersToDemoteFromRankI or membersToDemoteFromRankII ?
+        _demote(demoted);
+    }
+
+    /**
+     * @dev Allows the owner to remove a Token from the validation process
+     * @param tokenId ID of the Token
+     */
+    function emergencyKillRequest(uint256 tokenId) external onlyOwner {
+        // TODO : Implement
+
+        // for (uint256 i = 0; i < firstSortTokens.length; i++) {
+        //     if (firstSortTokens[i].id == tokenId) {
+        //         // Remove token from firstSortTokens (refacto this)
+        //         firstSortTokens[i] = firstSortTokens[
+        //             firstSortTokens.length - 1
+        //         ];
+        //         indexOfFirstSortTokens[
+        //             firstSortTokens[firstSortTokens.length - 1].id
+        //         ] = i;
+        //         firstSortTokens.pop();
+        //         break;
+        //     }
+        // }
+
+        // for (uint256 i = 0; i < finalValidationTokens.length; i++) {
+        //     if (finalValidationTokens[i].id == tokenId) {
+        //         // Remove token from firstSortTokens (refacto this)
+        //         finalValidationTokens[i] = finalValidationTokens[
+        //             finalValidationTokens.length - 1
+        //         ];
+        //         indexOfFinalValidationTokens[
+        //             finalValidationTokens[finalValidationTokens.length - 1].id
+        //         ] = i;
+        //         finalValidationTokens.pop();
+        //         break;
+        //     }
+        // }
+    }
 
     /* Protocol Management */
 
@@ -190,14 +366,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         voteCooldown = _voteCooldown;
     }
 
-    /* Hierarchy Management */
-
-    // TODO : Add promote/demote
-
-    /* Emergency Methods */
-
-    // TODO : Add token emergency methods
-
     /* Funds Management */
 
     /**
@@ -230,4 +398,25 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         }
     }
 
+    /* Internal Methods */
+
+    /**
+     * @dev Increase user rank
+     * @param promoted Address of the user
+     */
+    function _promote(address promoted) internal {
+        delete promoteVotes[promoted];
+
+        emit UserPromoted(promoted, ++rank[promoted]);
+    }
+
+    /**
+     * @dev Decrease user rank
+     * @param demoted Address of the user
+     */
+    function _demote(address demoted) internal {
+        delete demoteVotes[demoted];
+
+        emit UserDemoted(demoted, --rank[demoted]);
+    }
 }
