@@ -212,7 +212,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         token.lastUpdate = block.timestamp;
 
         tokens.push(token);
-        token.id = tokens.length;
+        token.id = tokens.length - 1;
 
         if (coeff >= PAYMENT_COEFF) {
             status = TokenStatus.FirstSort;
