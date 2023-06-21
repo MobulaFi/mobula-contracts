@@ -10,6 +10,13 @@ import "./interfaces/IERC20Extended.sol";
 import "./lib/ProtocolErrors.sol";
 import "./lib/TokenStruct.sol";
 
+/*
+    SUGGESTIONS :
+    - Add a cooldown for whitelisted submitters
+        -> MOBL could be farmed by malicious whitelisted submitters
+    - 
+
+*/
 
 contract TokensProtocolProxy is Initializable, Ownable2Step {
 
@@ -34,11 +41,31 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         _;
     }
 
+    /* Enums */
+    /**
+     * @dev Enum to define Token status
+     * @custom:Pool Initial Token status 
+     * @custom:FirstSort RankI users can vote for this Token
+     * @custom:FinalValidation RankII users can vote to validate this Token
+     * @custom:Validated Token has been validated and listed
+     */
+    enum TokenStatus {
+        Pool,
+        FirstSort,
+        FinalValidation,
+        Validated
+    }
+
     /* Protocol variables */
     /**
      * @dev whitelistedStable Does an ERC20 stablecoin is whitelisted as listing payment
      */
     mapping(address => bool) public whitelistedStable;
+
+    /**
+     * @dev whitelistedSubmitter Does this user needs to pay for a Token submission
+     */
+     mapping(address => bool) public whitelistedSubmitter;
 
     /**
      * @dev protocolAPI API address
@@ -49,6 +76,15 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @dev submitFloorPrice Minimim price to pay for a listing
      */
     uint256 public submitFloorPrice;
+
+    /**
+     * @dev tokens Tokens submitted
+     * @dev tokenStatus Token status
+     * @dev tokenCoeff Token coeff
+     */
+    Token[] public tokens;
+    mapping(uint256 => TokenStatus) public tokenStatus;
+    mapping(uint256 => uint256) public tokenCoeff;
 
     /**
      * @dev firstSortMaxVotes Maximum votes count for first validation
@@ -106,11 +142,18 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     mapping(address => uint256) public paidRewards;
 
     /**
+     * @dev PAYMENT_COEFF Payment coefficient
+     */
+    uint256 private constant PAYMENT_COEFF = 1000;
+
+    /**
      * @dev mobulaToken MOBL token address
      */
-    address mobulaToken;
+    address private mobulaToken;
 
     /* Events */
+    event TokenSubmitted(address submitter, Token token);
+    event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event UserPromoted(address indexed promoted, uint256 newRank);
     event UserDemoted(address indexed demoted, uint256 newRank);
@@ -129,13 +172,95 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     
     /* Users methods */
 
-    // TODO : Add submitToken + add Axelar submitHandler + add updateToken
-    
-    // TODO : Add claimRewards
+    // TODO : Add submitToken + add updateToken
+
+    /**
+     * @dev Allows a user to submit a Token for validation
+     * @param ipfsHash IPFS hash of the Token
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     * @param assetId Asset ID
+     */
+    // QUESTIONS : Can somebody pay with MATIC ? Why does the user can chose assetId ?
+    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, uint256 assetId)
+        external
+    {
+        uint256 coeff;
+        TokenStatus status;
+
+        if (whitelistedSubmitter[msg.sender]) {
+            coeff = PAYMENT_COEFF;
+        } else if (paymentAmount != 0) {
+            // TODO : Create an internal method that can be used in topUpToken() too
+            if (!whitelistedStable[paymentTokenAddress]) {
+                revert InvalidPaymentToken(paymentTokenAddress);
+            }
+
+            IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
+            uint256 amount = paymentAmount * 10**paymentToken.decimals();
+            bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
+
+            if (!success) {
+                revert TokenPaymentFailed(paymentTokenAddress, amount);
+            }
+
+            coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
+        }
+
+        Token memory token;
+        token.ipfsHash = ipfsHash;
+        token.lastUpdate = block.timestamp;
+
+        tokens.push(token);
+        token.id = tokens.length;
+
+        if (coeff >= PAYMENT_COEFF) {
+            status = TokenStatus.FirstSort;
+        }
+
+        tokenStatus[token.id] = status;
+        tokenCoeff[token.id] = coeff;
+
+        emit TokenSubmitted(msg.sender, token);
+    }
+
+    /**
+     * @dev Allows a user to top up listing payment
+     * @param tokenId ID of the Token to top up
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     */
+    function topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external {
+        // TODO
+    }
+
+    /**
+     * @dev Claim User rewards
+     * @param user User to claim rewards for
+     */
+    function claimRewards(address user) external {
+        uint256 amountToPay = owedRewards[user];
+        if (amountToPay == 0) {
+            revert NothingToClaim(user);
+        }
+
+        paidRewards[user] += amountToPay;
+        delete owedRewards[user];
+
+        uint256 moblAmount = amountToPay / PAYMENT_COEFF;
+
+        IERC20(mobulaToken).transfer(user, moblAmount);
+
+        emit RewardsClaimed(user, moblAmount);
+    }
+
+    /* Axelar callbacks */
+
+    // TODO : add Axelar submitHandler
 
     /* Votes */
 
-    // TODO : Add votes methods + create modifiers (onlyRanked, onlyRankII...)
+    // TODO : Add votes methods
 
     /* Hierarchy Management */
 
@@ -273,6 +398,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     function toggleWhitelistedStable(address _stableAddress) external onlyOwner {
         whitelistedStable[_stableAddress] = !whitelistedStable[_stableAddress];
+    }
+
+    function toggleWhitelistedSubmitter(address _submitter) external onlyOwner {
+        whitelistedSubmitter[_submitter] = !whitelistedSubmitter[_submitter];
     }
 
     function updateProtocolAPIAddress(address _protocolAPI) external onlyOwner {
