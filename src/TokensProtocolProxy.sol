@@ -166,7 +166,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         external
     {
         uint256 coeff;
-        TokenStatus status;
+        ListingStatus status;
 
         if (whitelistedSubmitter[msg.sender]) {
             coeff = PAYMENT_COEFF;
@@ -175,7 +175,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         }
 
         if (coeff >= PAYMENT_COEFF) {
-            status = TokenStatus.FirstSort;
+            status = ListingStatus.Sorting;
         }
 
         Token memory token;
@@ -210,8 +210,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
 
         if (tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
-            tokenListings[tokenId].status = TokenStatus.FirstSort;
+            tokenListings[tokenId].status = ListingStatus.Sorting;
         }
+
+        // QUESTION : Update lastUpdate ?
     }
 
     /**
@@ -241,6 +243,40 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /* Votes */
 
     // TODO : Add votes methods
+
+    function voteSorting(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
+        external
+        onlyRanked
+    {
+        // TODO
+        if (tokenId >= tokenListings.length) {
+            revert TokenNotFound(tokenId);
+        }
+        TokenListing storage listing = tokenListings[tokenId];
+
+        if (listing.status != ListingStatus.Sorting) {
+            revert NotSortingListing(listing.token, listing.status);
+        }
+
+        if (listing.token.lastUpdate > block.timestamp - voteCooldown) {
+            revert TokenInCooldown(listing.token);
+        }
+
+        if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
+            revert InvalidScoreValue();
+        }
+
+        // TODO : Add voter's scores to listing (outside mapping)
+
+        // TODO : Save that user voted
+
+        // TODO : Save vote
+
+        // TODO : Check validation/rejection
+
+        // IDEA : Create a Sorting Struct -> a listing could have several Sorting and Validation occurences
+            // 
+    }
 
     /* Hierarchy Management */
 

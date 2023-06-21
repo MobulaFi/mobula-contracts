@@ -3,16 +3,30 @@ pragma solidity 0.8.19;
 
 
 /**
+* @dev Enum to define a listing vote
+* @custom:Accept Accept the Token
+* @custom:Reject Reject the Token
+* @custom:ModificationsNeeded Token needs modifications
+*/
+enum ListingVote {
+    Accept,
+    Reject,
+    ModificationsNeeded
+}
+
+/**
 * @dev Enum to define Token status
 * @custom:Pool Initial Token status 
-* @custom:FirstSort RankI users can vote for this Token
-* @custom:FinalValidation RankII users can vote to validate this Token
+* @custom:Updating Submitter needs to update Token details
+* @custom:Sorting RankI users can vote to sort this Token
+* @custom:Validation RankII users can vote to validate this Token
 * @custom:Validated Token has been validated and listed
 */
-enum TokenStatus {
+enum ListingStatus {
     Pool,
-    FirstSort,
-    FinalValidation,
+    Updating,
+    Sorting,
+    Validation,
     Validated
 }
 
@@ -35,11 +49,11 @@ struct Token {
 
 /**
  * @custom:token Token
- * @custom:coeff Token coeff
- * @custom:status Token status
+ * @custom:coeff Listing coeff
+ * @custom:status Listing status
  */
 struct TokenListing {
     Token token;
     uint256 coeff;
-    TokenStatus status;
+    ListingStatus status;
 } 

@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "./TokenStructs.sol";
+
+// TODO : Add NatSpec
+
 error InvalidPaymentToken(address paymentToken);
 error TokenPaymentFailed(address paymentToken, uint256 amount);
 error TokenNotFound(uint256 tokenId);
 error InvalidPaymentAmount();
+error NotSortingListing(Token token, ListingStatus status);
+error TokenInCooldown(Token token);
+error InvalidScoreValue();
 error InsufficientProtocolBalance(uint256 protocolBalance, uint256 amountToWithdraw);
 error NothingToClaim(address claimer);
 error ETHTransferFailed(address recipient);
