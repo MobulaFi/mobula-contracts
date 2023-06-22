@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import "./interfaces/IAPI.sol";
+import "./interfaces/IAPIOld.sol";
 import "./interfaces/IERC20Extended.sol";
 
 struct SubmitQuery {

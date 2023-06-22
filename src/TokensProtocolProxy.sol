@@ -14,7 +14,11 @@ import "./lib/TokenStructs.sol";
     SUGGESTIONS :
     - Add a cooldown for whitelisted submitters
         -> MOBL could be farmed by malicious whitelisted submitters
-    - 
+    - Init ProtocolAPI at launch
+    - Pausable ?
+
+    QUESTIONS :
+    - When update token.lastUpdate ?
 
 */
 
@@ -51,11 +55,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @dev whitelistedSubmitter Does this user needs to pay for a Token submission
      */
     mapping(address => bool) public whitelistedSubmitter;
-
-    /**
-     * @dev protocolAPI API address
-     */
-    address public protocolAPI;
 
     /**
      * @dev submitFloorPrice Minimim price to pay for a listing
@@ -162,6 +161,11 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     address private mobulaToken;
 
+    /**
+     * @dev protocolAPI API address
+     */
+    address public protocolAPI;
+
     /* Events */
     // TODO : NatSpec
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
@@ -171,6 +175,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     event UserDemoted(address indexed demoted, uint256 newRank);
     event ListingStatusUpdated(Token token, ListingStatus previousStatus, ListingStatus newStatus);
     event SortingVote(Token token, address voter, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore);
+    event ValidationVote(Token token, address voter, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore);
+    event TokenValidated(Token token);
 
     function initialize(address _owner, address _mobulaToken)
         public
@@ -248,8 +254,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
             _updateListingStatus(tokenId, ListingStatus.Sorting);
         }
-
-        // QUESTION : Update lastUpdate ?
     }
 
     /**
@@ -282,8 +286,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     /* Votes */
 
-    // TODO : Add votes methods
-
+    // TODO : NatSpec
     function voteSorting(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
         external
         onlyRanked
@@ -331,6 +334,60 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             if (sortingAcceptances[tokenId].length * 100 >= sortingMaxVotes * sortingMinAcceptancesPct) {
                 _updateListingStatus(tokenId, ListingStatus.Validation);
             } else {
+                _updateListingStatus(tokenId, ListingStatus.Rejected);
+            }
+        }
+    }
+
+    function voteValidation(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
+        external
+        onlyRankII
+    {
+        if (tokenId >= tokenListings.length) {
+            revert TokenNotFound(tokenId);
+        }
+        TokenListing storage listing = tokenListings[tokenId];
+
+        if (listing.status != ListingStatus.Validation) {
+            revert NotValidationListing(listing.token, listing.status);
+        }
+
+        if (validationVotesPhase[tokenId][msg.sender] >= listing.phase) {
+            revert AlreadyVoted(msg.sender, listing.status, listing.phase);
+        }
+
+        validationVotesPhase[tokenId][msg.sender] = listing.phase;
+
+        if (vote == ListingVote.ModificationsNeeded) {
+            validationModifications[tokenId].push(msg.sender);
+        } else if (vote == ListingVote.Reject) {
+            validationRejections[tokenId].push(msg.sender);
+        } else {
+            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
+                revert InvalidScoreValue();
+            }
+
+            validationAcceptances[tokenId].push(msg.sender);
+
+            listing.accruedUtilityScore += utilityScore;
+            listing.accruedSocialScore += socialScore;
+            listing.accruedTrustScore += trustScore;
+        }
+
+        emit ValidationVote(listing.token, msg.sender, vote, utilityScore, socialScore, trustScore);
+
+        if (validationModifications[tokenId].length * 100 >= validationMaxVotes * validationMinModificationsPct) {
+            _updateListingStatus(tokenId, ListingStatus.Updating);
+        } else if (validationAcceptances[tokenId].length + validationRejections[tokenId].length + validationModifications[tokenId].length >= validationMaxVotes) {
+            if (validationAcceptances[tokenId].length * 100 >= validationMaxVotes * validationMinAcceptancesPct) {
+                _rewardVoters(tokenId, ListingStatus.Validated);
+
+                _saveToken(tokenId);
+
+                _updateListingStatus(tokenId, ListingStatus.Validated);
+            } else {
+                _rewardVoters(tokenId, ListingStatus.Rejected);
+
                 _updateListingStatus(tokenId, ListingStatus.Rejected);
             }
         }
@@ -651,8 +708,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         ListingStatus previousStatus = listing.status;
         listing.status = status;
 
-        if (status == ListingStatus.Updating) {
-            ++listing.phase;
+        if (status == ListingStatus.Updating || status == ListingStatus.Rejected || status == ListingStatus.Validated) {
+            if (status == ListingStatus.Updating) {
+                ++listing.phase;
+            }
 
             delete listing.accruedUtilityScore;
             delete listing.accruedSocialScore;
@@ -665,7 +724,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             delete validationRejections[tokenId];
             delete validationModifications[tokenId];
         }
-        // TODO : If status == Rejected or Validated -> reset votes and scores ?
 
         emit ListingStatusUpdated(listing.token, previousStatus, status);
     }
@@ -684,6 +742,61 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             array = rejectedListings;
         }
         return array;
+    }
+
+    function _saveToken(uint256 tokenId) internal {
+        TokenListing storage listing = tokenListings[tokenId];
+
+        uint256 scoresCount = sortingAcceptances[tokenId].length + validationAcceptances[tokenId].length;
+
+        // TODO : Handle float value (x10 then round() / 10 ?)
+        listing.token.utilityScore = listing.accruedUtilityScore / scoresCount;
+        listing.token.socialScore = listing.accruedSocialScore / scoresCount;
+        listing.token.trustScore = listing.accruedTrustScore / scoresCount;
+        
+        IAPI(protocolAPI).addAssetData(listing.token);
+
+        emit TokenValidated(listing.token);
+    }
+
+    function _rewardVoters(uint256 tokenId, ListingStatus finalStatus) internal {
+        uint256 coeff = tokenListings[tokenId].coeff;
+
+        for (uint256 i; i < sortingAcceptances[tokenId].length; i++) {
+            if (finalStatus == ListingStatus.Validated) {
+                ++goodSortingVotes[sortingAcceptances[tokenId][i]];
+                owedRewards[sortingAcceptances[tokenId][i]] += coeff;
+            } else {
+                ++badSortingVotes[sortingAcceptances[tokenId][i]];
+            }
+        }
+        
+        for (uint256 i; i < sortingRejections[tokenId].length; i++) {
+            if (finalStatus == ListingStatus.Rejected) {
+                ++goodSortingVotes[sortingRejections[tokenId][i]];
+                owedRewards[sortingRejections[tokenId][i]] += coeff;
+            } else {
+                ++badSortingVotes[sortingRejections[tokenId][i]];
+            }
+        }
+
+        for (uint256 i; i < validationAcceptances[tokenId].length; i++) {
+            if (finalStatus == ListingStatus.Validated) {
+                ++goodValidationVotes[validationAcceptances[tokenId][i]];
+                owedRewards[validationAcceptances[tokenId][i]] += coeff * 2;
+            } else {
+                ++badValidationVotes[validationAcceptances[tokenId][i]];
+            }
+        }
+
+        for (uint256 i; i < validationRejections[tokenId].length; i++) {
+            if (finalStatus == ListingStatus.Rejected) {
+                ++goodValidationVotes[validationRejections[tokenId][i]];
+                owedRewards[validationRejections[tokenId][i]] += coeff * 2;
+            } else {
+                ++badValidationVotes[validationRejections[tokenId][i]];
+            }
+        }
     }
 
     /**

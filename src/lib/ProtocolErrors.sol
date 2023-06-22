@@ -11,6 +11,7 @@ error TokenPaymentFailed(address paymentToken, uint256 amount);
 error TokenNotFound(uint256 tokenId);
 error InvalidPaymentAmount();
 error NotSortingListing(Token token, ListingStatus status);
+error NotValidationListing(Token token, ListingStatus status);
 error TokenInCooldown(Token token);
 error InvalidScoreValue();
 error InsufficientProtocolBalance(uint256 protocolBalance, uint256 amountToWithdraw);
