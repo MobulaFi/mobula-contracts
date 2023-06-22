@@ -15,19 +15,23 @@ enum ListingVote {
 }
 
 /**
-* @dev Enum to define Token status
-* @custom:Pool Initial Token status 
+* @dev Enum to define Listing status
+* @custom:Init Initial Listing status
+* @custom:Pool Token has been submitted
 * @custom:Updating Submitter needs to update Token details
 * @custom:Sorting RankI users can vote to sort this Token
 * @custom:Validation RankII users can vote to validate this Token
 * @custom:Validated Token has been validated and listed
+* @custom:Rejected Token has been rejected
 */
 enum ListingStatus {
+    Init,
     Pool,
     Updating,
     Sorting,
     Validation,
-    Validated
+    Validated,
+    Rejected
 }
 
 /**
@@ -51,9 +55,22 @@ struct Token {
  * @custom:token Token
  * @custom:coeff Listing coeff
  * @custom:status Listing status
+ * @custom:submitter User who submitted the Token for listing
+ * @custom:statusIndex Index of listing in corresponding statusArray
  */
+// TODO : Reorg for gas effiency
 struct TokenListing {
     Token token;
     uint256 coeff;
     ListingStatus status;
+    address submitter;
+    uint256 statusIndex;
+
+    // address[] sortingAccepters;
+    // address[] sortingRejecters;
+    // address[] validationAccepters;
+    // address[] validationRejecters;
+
+    // uint256 sortingVotersCount;
+    // uint256 validationVotersCount;
 } 

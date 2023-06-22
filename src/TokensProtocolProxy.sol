@@ -123,6 +123,21 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     mapping(address => uint256) public paidRewards;
 
     /**
+     * @dev poolListings IDs of listing in Pool state
+     * @dev updatingListings IDs of listing in Updating state
+     * @dev sortingListings IDs of listing in Sorting state
+     * @dev validationListings IDs of listing in Validation state
+     * @dev validatedListings IDs of listing in Validated state
+     * @dev rejectedListings IDs of listing in Rejected state
+     */
+    uint256[] poolListings;
+    uint256[] updatingListings;
+    uint256[] sortingListings;
+    uint256[] validationListings;
+    uint256[] validatedListings;
+    uint256[] rejectedListings;
+    
+    /**
      * @dev PAYMENT_COEFF Payment coefficient
      */
     uint256 private constant PAYMENT_COEFF = 1000;
@@ -133,11 +148,13 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     address private mobulaToken;
 
     /* Events */
+    // TODO : NatSpec
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event UserPromoted(address indexed promoted, uint256 newRank);
     event UserDemoted(address indexed demoted, uint256 newRank);
+    event ListingStatusUpdated(Token token, ListingStatus previousStatus, ListingStatus newStatus);
 
     function initialize(address _owner, address _mobulaToken)
         public
@@ -166,7 +183,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         external
     {
         uint256 coeff;
-        ListingStatus status;
+        ListingStatus status = ListingStatus.Pool;
 
         if (whitelistedSubmitter[msg.sender]) {
             coeff = PAYMENT_COEFF;
@@ -185,10 +202,12 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         TokenListing memory listing;
         listing.token = token;
         listing.coeff = coeff;
-        listing.status = status;
+        listing.submitter = msg.sender;
 
         tokenListings.push(listing);
         token.id = tokenListings.length - 1;
+
+        _updateListingStatus(token.id, status);
 
         emit TokenListingSubmitted(msg.sender, listing);
     }
@@ -209,8 +228,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
 
-        if (tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
-            tokenListings[tokenId].status = ListingStatus.Sorting;
+        if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
+            _updateListingStatus(tokenId, ListingStatus.Sorting);
         }
 
         // QUESTION : Update lastUpdate ?
@@ -228,6 +247,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         paidRewards[user] += amountToPay;
         delete owedRewards[user];
+
+        // TODO : Handle tokensPerVote
+        // uint256 amountToPay = (owedRewards[msg.sender] -
+        //     paidRewards[msg.sender]) * tokensPerVote;
 
         uint256 moblAmount = amountToPay / PAYMENT_COEFF;
 
@@ -261,6 +284,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (listing.token.lastUpdate > block.timestamp - voteCooldown) {
             revert TokenInCooldown(listing.token);
         }
+
+        // TODO : Check vote before scores -> might be rejected
 
         if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
             revert InvalidScoreValue();
@@ -357,7 +382,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (rankPromoted > 1) {
             revert RankPromotionImpossible(rankPromoted, 1);
         }
-        // TODO : Update membersToPromoteToRankI or membersToPromoteToRankII ?
         _promote(promoted);
     }
 
@@ -370,7 +394,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (rankDemoted == 0) {
             revert RankDemotionImpossible(rankDemoted, 1);
         }
-        // TODO : Update membersToDemoteFromRankI or membersToDemoteFromRankII ?
         _demote(demoted);
     }
 
@@ -544,6 +567,59 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     }
 
     /* Internal Methods */
+
+    function _updateListingStatus(uint256 tokenId, ListingStatus status) internal {
+        TokenListing storage listing = tokenListings[tokenId];
+
+        if (status == ListingStatus.Init) {
+            revert InvalidStatusUpdate(listing.token, listing.status, status);
+        }
+
+        if (status == ListingStatus.Pool) {
+            if (listing.status != ListingStatus.Init) {
+                revert InvalidStatusUpdate(listing.token, listing.status, status);
+            }
+
+            listing.statusIndex = poolListings.length;
+            poolListings.push(tokenId);
+        } else {
+            if (listing.status != ListingStatus.Init) {
+                uint256[] storage fromArray = _getStorageArrayForStatus(listing.status);
+
+                // Remove listing from current status array
+                uint256 indexMovedListing = fromArray[fromArray.length - 1];
+                fromArray[listing.statusIndex] = indexMovedListing;
+                tokenListings[indexMovedListing].statusIndex = listing.statusIndex;
+                fromArray.pop();
+            }
+
+            uint256[] storage toArray = _getStorageArrayForStatus(status);
+            // Add listing to new status array
+            listing.statusIndex = toArray.length;
+            toArray.push(tokenId);
+        }
+
+        ListingStatus previousStatus = listing.status;
+        listing.status = status;
+
+        emit ListingStatusUpdated(listing.token, previousStatus, status);
+    }
+
+    function _getStorageArrayForStatus(ListingStatus status) internal view returns (uint256[] storage) {
+        uint256[] storage array = poolListings;
+        if (status == ListingStatus.Updating) {
+            array = updatingListings;
+        } else if (status == ListingStatus.Sorting) {
+            array = sortingListings;
+        } else if (status == ListingStatus.Validation) {
+            array = validationListings;
+        } else if (status == ListingStatus.Validated) {
+            array = validatedListings;
+        } else if (status == ListingStatus.Rejected) {
+            array = rejectedListings;
+        }
+        return array;
+    }
 
     /**
      * @dev Make the payment from user
