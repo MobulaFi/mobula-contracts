@@ -515,35 +515,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param tokenId ID of the Token
      */
     function emergencyKillRequest(uint256 tokenId) external onlyOwner {
-        // TODO : Implement
-
-        // for (uint256 i = 0; i < firstSortTokens.length; i++) {
-        //     if (firstSortTokens[i].id == tokenId) {
-        //         // Remove token from firstSortTokens (refacto this)
-        //         firstSortTokens[i] = firstSortTokens[
-        //             firstSortTokens.length - 1
-        //         ];
-        //         indexOfFirstSortTokens[
-        //             firstSortTokens[firstSortTokens.length - 1].id
-        //         ] = i;
-        //         firstSortTokens.pop();
-        //         break;
-        //     }
-        // }
-
-        // for (uint256 i = 0; i < finalValidationTokens.length; i++) {
-        //     if (finalValidationTokens[i].id == tokenId) {
-        //         // Remove token from firstSortTokens (refacto this)
-        //         finalValidationTokens[i] = finalValidationTokens[
-        //             finalValidationTokens.length - 1
-        //         ];
-        //         indexOfFinalValidationTokens[
-        //             finalValidationTokens[finalValidationTokens.length - 1].id
-        //         ] = i;
-        //         finalValidationTokens.pop();
-        //         break;
-        //     }
-        // }
+        _updateListingStatus(tokenId, ListingStatus.Killed);
     }
 
     /* Protocol Management */
@@ -736,7 +708,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         ListingStatus previousStatus = listing.status;
         listing.status = status;
 
-        if (status == ListingStatus.Updating || status == ListingStatus.Rejected || status == ListingStatus.Validated) {
+        if (status == ListingStatus.Updating || status == ListingStatus.Rejected || status == ListingStatus.Validated || status == ListingStatus.Killed) {
             if (status == ListingStatus.Updating) {
                 ++listing.phase;
             }

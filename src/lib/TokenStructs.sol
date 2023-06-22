@@ -23,6 +23,7 @@ enum ListingVote {
 * @custom:Validation RankII users can vote to validate this Token
 * @custom:Validated Token has been validated and listed
 * @custom:Rejected Token has been rejected
+* @custom:Killed Token has been killed by owner
 */
 enum ListingStatus {
     Init,
@@ -31,7 +32,8 @@ enum ListingStatus {
     Sorting,
     Validation,
     Validated,
-    Rejected
+    Rejected,
+    Killed
 }
 
 /**
