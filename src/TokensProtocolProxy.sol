@@ -19,6 +19,7 @@ import "./lib/TokenStructs.sol";
 
     QUESTIONS :
     - When update token.lastUpdate ?
+    - Can somebody pay with MATIC ? Why does the user can chose assetId ?
 
 */
 
@@ -140,10 +141,21 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     uint256[] validatedListings;
     uint256[] rejectedListings;
 
-    // TODO : NatSpec
+    /**
+     * @dev sortingVotesPhase Token's Sorting Users vote phase
+     * @dev validationVotesPhase Token's Validation Users vote phase
+     */
     mapping(uint256 => mapping(address => uint256)) public sortingVotesPhase;
     mapping(uint256 => mapping(address => uint256)) public validationVotesPhase;
 
+    /**
+     * @dev sortingAcceptances Token's Sorting Accept voters
+     * @dev sortingRejections Token's Sorting Reject voters
+     * @dev sortingModifications Token's Sorting ModificationsNeeded voters
+     * @dev validationAcceptances Token's Validation Accept voters
+     * @dev validationRejections Token's Validation Reject voters
+     * @dev validationModifications Token's Validation ModificationsNeeded voters
+     */
     mapping(uint256 => address[]) public sortingAcceptances;
     mapping(uint256 => address[]) public sortingRejections;
     mapping(uint256 => address[]) public sortingModifications;
@@ -167,7 +179,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     address public protocolAPI;
 
     /* Events */
-    // TODO : NatSpec
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
@@ -200,7 +211,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      */
-    // QUESTIONS : Can somebody pay with MATIC ? Why does the user can chose assetId ?
     function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount)
         external
     {
@@ -251,6 +261,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
 
+        // TODO : Event ?
+
         if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
             _updateListingStatus(tokenId, ListingStatus.Sorting);
         }
@@ -261,17 +273,13 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param user User to claim rewards for
      */
     function claimRewards(address user) external {
-        uint256 amountToPay = owedRewards[user];
+        uint256 amountToPay = owedRewards[user] * tokensPerVote;
         if (amountToPay == 0) {
             revert NothingToClaim(user);
         }
 
         paidRewards[user] += amountToPay;
         delete owedRewards[user];
-
-        // TODO : Handle tokensPerVote
-        // uint256 amountToPay = (owedRewards[msg.sender] -
-        //     paidRewards[msg.sender]) * tokensPerVote;
 
         uint256 moblAmount = amountToPay / PAYMENT_COEFF;
 
@@ -286,7 +294,14 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     /* Votes */
 
-    // TODO : NatSpec
+    /**
+     * @dev Allows a ranked user to vote for Token Sorting
+     * @param tokenId ID of the Token to vote for
+     * @param vote User's vote
+     * @param utilityScore Utility score
+     * @param socialScore Social score
+     * @param trustScore Trust score
+     */
     function voteSorting(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
         external
         onlyRanked
@@ -339,6 +354,14 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         }
     }
 
+    /**
+     * @dev Allows a rank II User to vote for Token Validation
+     * @param tokenId ID of the Token to vote for
+     * @param vote User's vote
+     * @param utilityScore Utility score
+     * @param socialScore Social score
+     * @param trustScore Trust score
+     */
     function voteValidation(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
         external
         onlyRankII
@@ -674,6 +697,11 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     /* Internal Methods */
 
+    /**
+     * @dev Update the status of a listing
+     * @param tokenId ID of the Token to vote for
+     * @param status New listing status
+     */
     function _updateListingStatus(uint256 tokenId, ListingStatus status) internal {
         TokenListing storage listing = tokenListings[tokenId];
 
@@ -728,6 +756,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         emit ListingStatusUpdated(listing.token, previousStatus, status);
     }
 
+    /**
+     * @dev Retrieve status' corresponding storage array
+     * @param status Status
+     */
     function _getStorageArrayForStatus(ListingStatus status) internal view returns (uint256[] storage) {
         uint256[] storage array = poolListings;
         if (status == ListingStatus.Updating) {
@@ -744,6 +776,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         return array;
     }
 
+    /**
+     * @dev Save Token in Protocol API
+     * @param tokenId ID of the Token to save
+     */
     function _saveToken(uint256 tokenId) internal {
         TokenListing storage listing = tokenListings[tokenId];
 
@@ -759,6 +795,11 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         emit TokenValidated(listing.token);
     }
 
+    /**
+     * @dev Reward voters of a Token listing process
+     * @param tokenId ID of the Token
+     * @param finalStatus Final status of the listing
+     */
     function _rewardVoters(uint256 tokenId, ListingStatus finalStatus) internal {
         uint256 coeff = tokenListings[tokenId].coeff;
 

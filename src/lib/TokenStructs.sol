@@ -9,7 +9,6 @@ pragma solidity 0.8.19;
 * @custom:ModificationsNeeded Token needs modifications
 */
 enum ListingVote {
-    // TODO : Add an init state ?
     Accept,
     Reject,
     ModificationsNeeded
