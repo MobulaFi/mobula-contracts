@@ -5,6 +5,7 @@ import "./TokenStructs.sol";
 
 // TODO : Add NatSpec + Token to tokenId ?
 
+error AlreadyVoted(address voter, ListingStatus status, uint256 listingPhase);
 error InvalidPaymentToken(address paymentToken);
 error TokenPaymentFailed(address paymentToken, uint256 amount);
 error TokenNotFound(uint256 tokenId);
@@ -21,4 +22,5 @@ error RankPromotionImpossible(uint256 userRank, uint256 maxCurrentRank);
 error NoPromotionYet(uint256 toRank);
 error RankDemotionImpossible(uint256 userRank, uint256 minCurrentRank);
 error NoDemotionYet(uint256 fromRank);
+error InvalidPercentage(uint256 percentage);
 error InvalidStatusUpdate(Token token, ListingStatus currentStatus, ListingStatus targetStatus);

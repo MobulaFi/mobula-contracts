@@ -50,7 +50,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /**
      * @dev whitelistedSubmitter Does this user needs to pay for a Token submission
      */
-     mapping(address => bool) public whitelistedSubmitter;
+    mapping(address => bool) public whitelistedSubmitter;
 
     /**
      * @dev protocolAPI API address
@@ -68,16 +68,20 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     TokenListing[] public tokenListings;
 
     /**
-     * @dev firstSortMaxVotes Maximum votes count for first validation
-     * @dev firstSortValidationsNeeded Validations count needed for first validation
-     * @dev finalDecisionMaxVotes Maximum votes count for final validation
-     * @dev finalDecisionValidationsNeeded Validations count needed for final validation
+     * @dev sortingMaxVotes Maximum votes count for Sorting
+     * @dev sortingMinAcceptancesPct Minimum % of Acceptances for Sorting
+     * @dev sortingMinModificationsPct Minimum % of ModificationsNeeded for Sorting
+     * @dev validationMaxVotes Maximum votes count for Validation
+     * @dev validationMinAcceptancesPct Minimum % of Acceptances for Validation
+     * @dev validationMinModificationsPct Minimum % of ModificationsNeeded for Validation
      * @dev tokensPerVote Amount of tokens rewarded per vote (* coeff)
      */
-    uint256 public firstSortMaxVotes;
-    uint256 public firstSortValidationsNeeded;
-    uint256 public finalDecisionMaxVotes;
-    uint256 public finalDecisionValidationsNeeded;
+    uint256 public sortingMaxVotes;
+    uint256 public sortingMinAcceptancesPct;
+    uint256 public sortingMinModificationsPct;
+    uint256 public validationMaxVotes;
+    uint256 public validationMinAcceptancesPct;
+    uint256 public validationMinModificationsPct;
     uint256 public tokensPerVote;
 
     /**
@@ -105,20 +109,20 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @dev rank User rank
      * @dev promoteVotes Amount of votes for User promotion
      * @dev demoteVotes Amount of votes for User demotion
-     * @dev goodFirstVotes Amount of User's 'good' first votes
-     * @dev badFirstVotes Amount of User's 'bad' first votes
-     * @dev goodFinalVotes Amount of User's 'good' final votes
-     * @dev badFinalVotes Amount of User's 'bad' final votes
+     * @dev goodSortingVotes Amount of User's 'good' first votes
+     * @dev badSortingVotes Amount of User's 'bad' first votes
+     * @dev goodValidationVotes Amount of User's 'good' final votes
+     * @dev badValidationVotes Amount of User's 'bad' final votes
      * @dev owedRewards Amount of User's owed rewards
      * @dev paidRewards Amount of User's paid rewards
      */
     mapping(address => uint256) public rank;
     mapping(address => uint256) public promoteVotes;
     mapping(address => uint256) public demoteVotes;
-    mapping(address => uint256) public goodFirstVotes;
-    mapping(address => uint256) public badFirstVotes;
-    mapping(address => uint256) public goodFinalVotes;
-    mapping(address => uint256) public badFinalVotes;
+    mapping(address => uint256) public goodSortingVotes;
+    mapping(address => uint256) public badSortingVotes;
+    mapping(address => uint256) public goodValidationVotes;
+    mapping(address => uint256) public badValidationVotes;
     mapping(address => uint256) public owedRewards;
     mapping(address => uint256) public paidRewards;
 
@@ -136,6 +140,17 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     uint256[] validationListings;
     uint256[] validatedListings;
     uint256[] rejectedListings;
+
+    // TODO : NatSpec
+    mapping(uint256 => mapping(address => uint256)) public sortingVotesPhase;
+    mapping(uint256 => mapping(address => uint256)) public validationVotesPhase;
+
+    mapping(uint256 => address[]) public sortingAcceptances;
+    mapping(uint256 => address[]) public sortingRejections;
+    mapping(uint256 => address[]) public sortingModifications;
+    mapping(uint256 => address[]) public validationAcceptances;
+    mapping(uint256 => address[]) public validationRejections;
+    mapping(uint256 => address[]) public validationModifications;
     
     /**
      * @dev PAYMENT_COEFF Payment coefficient
@@ -155,6 +170,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     event UserPromoted(address indexed promoted, uint256 newRank);
     event UserDemoted(address indexed demoted, uint256 newRank);
     event ListingStatusUpdated(Token token, ListingStatus previousStatus, ListingStatus newStatus);
+    event SortingVote(Token token, address voter, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore);
 
     function initialize(address _owner, address _mobulaToken)
         public
@@ -203,6 +219,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         listing.token = token;
         listing.coeff = coeff;
         listing.submitter = msg.sender;
+        listing.phase = 1;
 
         tokenListings.push(listing);
         token.id = tokenListings.length - 1;
@@ -271,7 +288,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         external
         onlyRanked
     {
-        // TODO
         if (tokenId >= tokenListings.length) {
             revert TokenNotFound(tokenId);
         }
@@ -285,22 +301,39 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             revert TokenInCooldown(listing.token);
         }
 
-        // TODO : Check vote before scores -> might be rejected
-
-        if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
-            revert InvalidScoreValue();
+        if (sortingVotesPhase[tokenId][msg.sender] >= listing.phase) {
+            revert AlreadyVoted(msg.sender, listing.status, listing.phase);
         }
 
-        // TODO : Add voter's scores to listing (outside mapping)
+        sortingVotesPhase[tokenId][msg.sender] = listing.phase;
 
-        // TODO : Save that user voted
+        if (vote == ListingVote.ModificationsNeeded) {
+            sortingModifications[tokenId].push(msg.sender);
+        } else if (vote == ListingVote.Reject) {
+            sortingRejections[tokenId].push(msg.sender);
+        } else {
+            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
+                revert InvalidScoreValue();
+            }
 
-        // TODO : Save vote
+            sortingAcceptances[tokenId].push(msg.sender);
 
-        // TODO : Check validation/rejection
+            listing.accruedUtilityScore += utilityScore;
+            listing.accruedSocialScore += socialScore;
+            listing.accruedTrustScore += trustScore;
+        }
 
-        // IDEA : Create a Sorting Struct -> a listing could have several Sorting and Validation occurences
-            // 
+        emit SortingVote(listing.token, msg.sender, vote, utilityScore, socialScore, trustScore);
+
+        if (sortingModifications[tokenId].length * 100 >= sortingMaxVotes * sortingMinModificationsPct) {
+            _updateListingStatus(tokenId, ListingStatus.Updating);
+        } else if (sortingAcceptances[tokenId].length + sortingRejections[tokenId].length + sortingModifications[tokenId].length >= sortingMaxVotes) {
+            if (sortingAcceptances[tokenId].length * 100 >= sortingMaxVotes * sortingMinAcceptancesPct) {
+                _updateListingStatus(tokenId, ListingStatus.Validation);
+            } else {
+                _updateListingStatus(tokenId, ListingStatus.Rejected);
+            }
+        }
     }
 
     /* Hierarchy Management */
@@ -434,7 +467,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     }
 
     /* Protocol Management */
-
+    // TODO : Add NatSpec
     function toggleWhitelistedStable(address _stableAddress) external onlyOwner {
         whitelistedStable[_stableAddress] = !whitelistedStable[_stableAddress];
     }
@@ -451,27 +484,43 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         submitFloorPrice = _submitFloorPrice;
     }
 
-    function updateFirstSortMaxVotes(uint256 _firstSortMaxVotes) external onlyOwner {
-        firstSortMaxVotes = _firstSortMaxVotes;
+    function updateSortingMaxVotes(uint256 _sortingMaxVotes) external onlyOwner {
+        sortingMaxVotes = _sortingMaxVotes;
     }
 
-    function updateFinalDecisionMaxVotes(uint256 _finalDecisionMaxVotes)
+    function updateValidationMaxVotes(uint256 _validationMaxVotes)
         external
         onlyOwner
     {
-        finalDecisionMaxVotes = _finalDecisionMaxVotes;
+        validationMaxVotes = _validationMaxVotes;
     }
 
-    function updateFirstSortValidationsNeeded(
-        uint256 _firstSortValidationsNeeded
-    ) external onlyOwner {
-        firstSortValidationsNeeded = _firstSortValidationsNeeded;
+    function updateSortingMinAcceptancesPct(uint256 _sortingMinAcceptancesPct) external onlyOwner {
+        if (_sortingMinAcceptancesPct > 100) {
+            revert InvalidPercentage(_sortingMinAcceptancesPct);
+        }
+        sortingMinAcceptancesPct = _sortingMinAcceptancesPct;
     }
 
-    function updateFinalDecisionValidationsNeeded(
-        uint256 _finalDecisionValidationsNeeded
-    ) external onlyOwner {
-        finalDecisionValidationsNeeded = _finalDecisionValidationsNeeded;
+    function updateSortingMinModificationsPct(uint256 _sortingMinModificationsPct) external onlyOwner {
+        if (_sortingMinModificationsPct > 100) {
+            revert InvalidPercentage(_sortingMinModificationsPct);
+        }
+        sortingMinModificationsPct = _sortingMinModificationsPct;
+    }
+
+    function updateValidationMinAcceptancesPct(uint256 _validationMinAcceptancesPct) external onlyOwner {
+        if (_validationMinAcceptancesPct > 100) {
+            revert InvalidPercentage(_validationMinAcceptancesPct);
+        }
+        validationMinAcceptancesPct = _validationMinAcceptancesPct;
+    }
+
+    function updateValidationMinModificationsPct(uint256 _validationMinModificationsPct) external onlyOwner {
+        if (_validationMinModificationsPct > 100) {
+            revert InvalidPercentage(_validationMinModificationsPct);
+        }
+        validationMinModificationsPct = _validationMinModificationsPct;
     }
 
     function updateTokensPerVote(uint256 _tokensPerVote) external onlyOwner {
@@ -601,6 +650,22 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         ListingStatus previousStatus = listing.status;
         listing.status = status;
+
+        if (status == ListingStatus.Updating) {
+            ++listing.phase;
+
+            delete listing.accruedUtilityScore;
+            delete listing.accruedSocialScore;
+            delete listing.accruedTrustScore;
+
+            delete sortingAcceptances[tokenId];
+            delete sortingRejections[tokenId];
+            delete sortingModifications[tokenId];
+            delete validationAcceptances[tokenId];
+            delete validationRejections[tokenId];
+            delete validationModifications[tokenId];
+        }
+        // TODO : If status == Rejected or Validated -> reset votes and scores ?
 
         emit ListingStatusUpdated(listing.token, previousStatus, status);
     }

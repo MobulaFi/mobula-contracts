@@ -9,6 +9,7 @@ pragma solidity 0.8.19;
 * @custom:ModificationsNeeded Token needs modifications
 */
 enum ListingVote {
+    // TODO : Add an init state ?
     Accept,
     Reject,
     ModificationsNeeded
@@ -42,6 +43,7 @@ enum ListingStatus {
  * @custom:socialScore Token's social score
  * @custom:trustScore Token's trust score
  */
+// TODO : Use uint8 score type ?
 struct Token {
     string ipfsHash;
     uint256 id;
@@ -57,8 +59,12 @@ struct Token {
  * @custom:status Listing status
  * @custom:submitter User who submitted the Token for listing
  * @custom:statusIndex Index of listing in corresponding statusArray
+ * @custom:accruedUtilityScore Sum of voters utility score
+ * @custom:accruedSocialScore Sum of voters social score
+ * @custom:accruedTrustScore Sum of voters trust score
+ * @custom:phase Phase count
  */
-// TODO : Reorg for gas effiency
+// TODO : Reorg for gas effiency 
 struct TokenListing {
     Token token;
     uint256 coeff;
@@ -66,11 +72,9 @@ struct TokenListing {
     address submitter;
     uint256 statusIndex;
 
-    // address[] sortingAccepters;
-    // address[] sortingRejecters;
-    // address[] validationAccepters;
-    // address[] validationRejecters;
+    uint256 accruedUtilityScore;
+    uint256 accruedSocialScore;
+    uint256 accruedTrustScore;
 
-    // uint256 sortingVotersCount;
-    // uint256 validationVotersCount;
-} 
+    uint256 phase;
+}
