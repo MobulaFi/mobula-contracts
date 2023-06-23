@@ -133,6 +133,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @dev validationListings IDs of listing in Validation state
      * @dev validatedListings IDs of listing in Validated state
      * @dev rejectedListings IDs of listing in Rejected state
+     * @dev killedListings IDs of listing in Killed state
      */
     uint256[] poolListings;
     uint256[] updatingListings;
@@ -140,6 +141,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     uint256[] validationListings;
     uint256[] validatedListings;
     uint256[] rejectedListings;
+    uint256[] killedListings;
 
     /**
      * @dev sortingVotesPhase Token's Sorting Users vote phase
@@ -744,6 +746,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             array = validatedListings;
         } else if (status == ListingStatus.Rejected) {
             array = rejectedListings;
+        } else if (status == ListingStatus.Killed) {
+            array = killedListings;
         }
         return array;
     }
