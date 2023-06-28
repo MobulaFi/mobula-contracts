@@ -202,7 +202,45 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     /* Getters */
 
-    // TODO : Add mapping and arrays getters
+    /**
+     * @dev Retrieve all Token listings
+     */
+    function getTokenListings() external view returns (TokenListing[] memory) {
+        return tokenListings;
+    }
+
+    /**
+     * @dev Retrieve all Token listings in Sorting status
+     */
+    function getSortingTokenListings() external view returns (TokenListing[] memory) {
+        return getTokenListingsWithStatus(ListingStatus.Sorting);
+    }
+
+    /**
+     * @dev Retrieve all Token listings in Validation status
+     */
+    function getValidationTokenListings() external view returns (TokenListing[] memory) {
+        return getTokenListingsWithStatus(ListingStatus.Validation);
+    }
+
+    /**
+     * @dev Retrieve all Token listings in a specific status
+     * @param status Status of listings to retrieve
+     */
+    function getTokenListingsWithStatus(ListingStatus status) public view returns (TokenListing[] memory) {
+        if (status == ListingStatus.Init) {
+            return new TokenListing[](0);
+        }
+
+        uint256[] memory tokenIds = _getStorageArrayForStatus(status);
+
+        TokenListing[] memory listings = new TokenListing[](tokenIds.length);
+        for (uint256 i; i < listings.length; i++) {
+            listings[i] = tokenListings[tokenIds[i]];
+        }
+
+        return listings;
+    }
     
     /* Users methods */
 
