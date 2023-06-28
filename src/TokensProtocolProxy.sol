@@ -265,6 +265,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         }
 
         listing.token.ipfsHash = ipfsHash;
+        listing.token.lastUpdate = block.timestamp;
 
         emit TokenDetailsUpdated(listing.token);
         
@@ -737,7 +738,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /* Internal Methods */
 
     /**
-     * @dev Update the status of a listing
+     * @dev Update the status of a listing, by moving the listing/token index from one status array to another one
      * @param tokenId ID of the Token to vote for
      * @param status New listing status
      */
@@ -748,34 +749,30 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             revert InvalidStatusUpdate(listing.token, listing.status, status);
         }
 
-        if (status == ListingStatus.Pool) {
-            if (listing.status != ListingStatus.Init) {
+        if (listing.status != ListingStatus.Init) {
+            // Can only be updated to Pool status, if current status is Init
+            if (status == ListingStatus.Pool) {
                 revert InvalidStatusUpdate(listing.token, listing.status, status);
             }
-
-            listing.statusIndex = poolListings.length;
-            poolListings.push(tokenId);
-        } else {
-            if (listing.status != ListingStatus.Init) {
-                uint256[] storage fromArray = _getStorageArrayForStatus(listing.status);
-
-                // Remove listing from current status array
-                uint256 indexMovedListing = fromArray[fromArray.length - 1];
-                fromArray[listing.statusIndex] = indexMovedListing;
-                tokenListings[indexMovedListing].statusIndex = listing.statusIndex;
-                fromArray.pop();
-            }
-
-            uint256[] storage toArray = _getStorageArrayForStatus(status);
-            // Add listing to new status array
-            listing.statusIndex = toArray.length;
-            toArray.push(tokenId);
+            // Remove listing from current status array
+            uint256[] storage fromArray = _getStorageArrayForStatus(listing.status);
+            uint256 indexMovedListing = fromArray[fromArray.length - 1];
+            fromArray[listing.statusIndex] = indexMovedListing;
+            tokenListings[indexMovedListing].statusIndex = listing.statusIndex;
+            fromArray.pop();
         }
+
+        // Add listing to new status array
+        uint256[] storage toArray = _getStorageArrayForStatus(status);
+        listing.statusIndex = toArray.length;
+        toArray.push(tokenId);
 
         ListingStatus previousStatus = listing.status;
         listing.status = status;
 
+        // For these status, we need to reset all votes and scores of the listing
         if (status == ListingStatus.Updating || status == ListingStatus.Rejected || status == ListingStatus.Validated || status == ListingStatus.Killed) {
+            // Increment listing phase, so voters will be able to vote again on this listing
             if (status == ListingStatus.Updating) {
                 ++listing.phase;
             }
