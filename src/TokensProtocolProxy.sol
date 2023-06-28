@@ -182,6 +182,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
     /* Events */
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
+    event TokenDetailsUpdated(Token token);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event UserPromoted(address indexed promoted, uint256 newRank);
@@ -205,7 +206,33 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     
     /* Users methods */
 
-    // TODO : add updateToken
+    /**
+     * @dev Allows the submitter of a Token to update Token details
+     * @param tokenId ID of the Token to update
+     * @param ipfsHash New IPFS hash of the Token
+     */
+    function updateToken(uint256 tokenId, string memory ipfsHash) external {
+        if (tokenId >= tokenListings.length) {
+            revert TokenNotFound(tokenId);
+        }
+
+        TokenListing storage listing = tokenListings[tokenId];
+
+        if (listing.status != ListingStatus.Updating) {
+            revert NotUpdatingListing(listing.token, listing.status);
+        }
+
+        if (listing.submitter != msg.sender) {
+            revert InvalidUpdatingUser(msg.sender, listing.submitter);
+        }
+
+        listing.token.ipfsHash = ipfsHash;
+
+        emit TokenDetailsUpdated(listing.token);
+        
+        // We put the Token back to Sorting (impossible to be in Pool status)
+        _updateListingStatus(tokenId, ListingStatus.Sorting);
+    }
 
     /**
      * @dev Allows a user to submit a Token for validation
