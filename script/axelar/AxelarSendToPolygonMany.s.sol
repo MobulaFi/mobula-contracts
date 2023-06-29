@@ -17,7 +17,7 @@ contract AxelarSendToMany is Base {
         address arbToken = 0x912CE59144191C1204E64559FE8253a0e49E6548;
         uint256 amountGas = 1e16;
 
-        string memory destinationChain = "binance";
+        string memory destinationChain = "Polygon";
         string memory destinationAddress = "0x11D70b2aee11364f55d923da35ca984F152bD84c";
         address[] memory destinationAddresses = new address[](2);
         destinationAddresses[0] = dada;
@@ -27,7 +27,7 @@ contract AxelarSendToMany is Base {
         
         IERC20(arbToken).approve(axelarSender, amount);
 
-        AxelarSender(axelarSender).sendToMany{value: amountGas}(destinationChain, destinationAddress, destinationAddresses, symbol, amount);
+        // AxelarSender(axelarSender).sendToMany{value: amountGas}(destinationChain, destinationAddress, destinationAddresses, symbol, amount);
 
         vm.stopBroadcast();
     }
