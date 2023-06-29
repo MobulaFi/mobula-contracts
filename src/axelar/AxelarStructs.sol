@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 enum MobulaMethod {
     SubmitToken,
     UpdateToken,
-    TopUpToken
+    TopUpToken,
+    TestRevert
 }
 
 struct MobulaPayload {

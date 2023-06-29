@@ -9,10 +9,18 @@ contract DeployAxelarReceiver is Base {
     function setUp() public {}
 
     function run() external {
-        vm.startBroadcast(deployerBNBPK);
+        vm.startBroadcast(deployerPolygonPK);
 
-        new AxelarReceiver(axelarBNBGateway);
+        new AxelarReceiver(axelarPolygonGateway);
 
         vm.stopBroadcast();
     }
+
+    // function run() external {
+    //     vm.startBroadcast(deployerBNBPK);
+
+    //     new AxelarReceiver(axelarBNBGateway);
+
+    //     vm.stopBroadcast();
+    // }
 }

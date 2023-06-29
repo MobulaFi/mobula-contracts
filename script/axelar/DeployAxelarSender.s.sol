@@ -9,10 +9,18 @@ contract DeployAxelarSender is Base {
     function setUp() public {}
 
     function run() external {
-        vm.startBroadcast(deployerArbitrumPK);
+        vm.startBroadcast(deployerBNBPK);
 
-        new AxelarSender(axelarArbitrumGateway, axelarArbitrumGas);
+        new AxelarSender(axelarBNBGateway, axelarBNBGas);
 
         vm.stopBroadcast();
     }
+
+    // function run() external {
+    //     vm.startBroadcast(deployerArbitrumPK);
+
+    //     new AxelarSender(axelarArbitrumGateway, axelarArbitrumGas);
+
+    //     vm.stopBroadcast();
+    // }
 }

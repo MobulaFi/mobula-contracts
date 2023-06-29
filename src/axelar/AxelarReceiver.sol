@@ -10,6 +10,8 @@ contract AxelarReceiver is AxelarExecutable {
 
     constructor(address gateway_) AxelarExecutable(gateway_) {}
 
+    error AxelarRevert(string message, address sourceSender);
+
     event UpdateTokenRequested(uint256 tokenId, string ipfsHash, address sourceSender);
     event SubmitTokenRequested(string ipfsHash, address paymentTokenAddress, uint256 paymentAmount, address sourceSender);
     event TopUpTokenRequested(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount, address sourceSender);
@@ -31,6 +33,8 @@ contract AxelarReceiver is AxelarExecutable {
             _updateTokenAxelar(mPayload.tokenId, mPayload.ipfsHash, mPayload.sender);
         } else if (mPayload.method == MobulaMethod.TopUpToken) {
             _topUpTokenAxelar(mPayload.tokenId, tokenAddress, amount, mPayload.sender);
+        } else if (mPayload.method == MobulaMethod.TestRevert) {
+            _revertAxelar(mPayload.ipfsHash, mPayload.sender);
         }
     }
 
@@ -45,6 +49,8 @@ contract AxelarReceiver is AxelarExecutable {
             _submitTokenAxelar(mPayload.ipfsHash, address(0), 0, mPayload.sender);
         } else if (mPayload.method == MobulaMethod.UpdateToken) {
             _updateTokenAxelar(mPayload.tokenId, mPayload.ipfsHash, mPayload.sender);
+        } else if (mPayload.method == MobulaMethod.TestRevert) {
+            _revertAxelar(mPayload.ipfsHash, mPayload.sender);
         }
     }
 
@@ -60,5 +66,9 @@ contract AxelarReceiver is AxelarExecutable {
 
     function _topUpTokenAxelar(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender) internal {
         emit TopUpTokenRequested(tokenId, paymentTokenAddress, paymentAmount, sourceMsgSender);
+    }
+
+    function _revertAxelar(string memory ipfsHash, address sourceMsgSender) internal {
+        revert AxelarRevert(ipfsHash, sourceMsgSender);
     }
 }

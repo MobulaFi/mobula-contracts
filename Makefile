@@ -7,16 +7,28 @@
 #	--- Scripts Axelar ---
 #
 
-script-axelar-sendtomany:
-	forge script script/axelar/AxelarSendToMany.s.sol:AxelarSendToMany --rpc-url ${ARBITRUM_RPC_URL} --broadcast -vvvv
+script-axelar-bnb-updatetoken:
+	forge script script/axelar/AxelarCalls.s.sol:AxelarUpdateToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
-script-axelar-sendtomany-polygon:
-	forge script script/axelar/AxelarSendToPolygonMany.s.sol:AxelarSendToMany --rpc-url ${ARBITRUM_RPC_URL} --broadcast -vvvv
+script-axelar-bnb-submittoken:
+	forge script script/axelar/AxelarCalls.s.sol:AxelarSubmitToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
-script-deploy-axelar-sender:
+script-axelar-bnb-topuptoken:
+	forge script script/axelar/AxelarCalls.s.sol:AxelarTopUpToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+
+script-axelar-bnb-revert:
+	forge script script/axelar/AxelarCalls.s.sol:AxelarRevert --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+
+script-deploy-axelar-bnb-sender:
+	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
+
+script-deploy-axelar-polygon-sender:
+	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+
+script-deploy-axelar-arbitrum-sender:
 	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${ARBITRUM_RPC_URL} --broadcast --verify --chain-id 42161 --etherscan-api-key ${ARBISCAN_API_KEY} -vvvv
 
-script-deploy-axelar-receiver:
+script-deploy-axelar-bnb-receiver:
 	forge script script/axelar/DeployAxelarReceiver.s.sol:DeployAxelarReceiver --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-polygon-receiver:

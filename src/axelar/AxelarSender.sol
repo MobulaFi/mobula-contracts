@@ -8,6 +8,16 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./AxelarStructs.sol";
 
+/*
+    CONCERNS :
+    - Should we implement the 'revert' logic here ?
+    - What happen to gas left ? -> refunded minutes after
+    - What happen on a reverted tx on destination chain ?
+    - Use callContractWithTokenExpress() ? -> partnership with axelar probably needed
+    - Need to WL axlTokens
+
+*/
+
 contract AxelarSender is AxelarExecutable, Ownable {
     IAxelarGasService public immutable gasService;
 
@@ -31,42 +41,38 @@ contract AxelarSender is AxelarExecutable, Ownable {
         _sendCrosschain(payload, "", 0);
     }
     
-    function submitTokenAxelar(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external payable
+    function submitTokenAxelar(string memory ipfsHash, string memory symbol, uint256 paymentAmount) external payable
     {
         require(msg.value > 0, 'Gas payment is required');
 
         bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.SubmitToken, msg.sender, ipfsHash, 0));
 
-        // TODO : Get tokenSymbol from address -> need a mapping ?
-        string memory symbol;
-        if (paymentAmount != 0) {
-            address tokenAddress = gateway.tokenAddresses(symbol);
-            IERC20(tokenAddress).transferFrom(msg.sender, address(this), paymentAmount);
-            IERC20(tokenAddress).approve(address(gateway), paymentAmount);
-        }
-
         _sendCrosschain(payload, symbol, paymentAmount);
     }
 
-    function topUpTokenAxelar(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external payable {
+    function topUpTokenAxelar(uint256 tokenId, string memory symbol, uint256 paymentAmount) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
         bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, "", tokenId));
 
-        // TODO : Get tokenSymbol from address -> need a mapping ?
-        string memory symbol;
-        if (paymentAmount != 0) {
-            address tokenAddress = gateway.tokenAddresses(symbol);
-            IERC20(tokenAddress).transferFrom(msg.sender, address(this), paymentAmount);
-            IERC20(tokenAddress).approve(address(gateway), paymentAmount);
-        }
-
         _sendCrosschain(payload, symbol, paymentAmount);
+    }
+
+    function revertAxelar(string memory message) external payable {
+        require(msg.value > 0, 'Gas payment is required');
+
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, message, 0));
+
+        _sendCrosschain(payload, "", 0);
     }
 
     function _sendCrosschain(bytes memory payload, string memory symbol, uint256 amount) internal {
         // TODO : Check callContractWithTokenExpress()
         if (amount != 0) {
+            address tokenAddress = gateway.tokenAddresses(symbol);
+            IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+            IERC20(tokenAddress).approve(address(gateway), amount);
+
             gasService.payNativeGasForContractCallWithToken{ value: msg.value }(
                 address(this),
                 destinationChain,
