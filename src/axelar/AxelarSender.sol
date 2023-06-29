@@ -66,6 +66,14 @@ contract AxelarSender is AxelarExecutable, Ownable {
         _sendCrosschain(payload, "", 0);
     }
 
+    function revertPaymentAxelar(string memory message, string memory symbol, uint256 paymentAmount) external payable {
+        require(msg.value > 0, 'Gas payment is required');
+
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, message, 0));
+
+        _sendCrosschain(payload, symbol, paymentAmount);
+    }
+
     function _sendCrosschain(bytes memory payload, string memory symbol, uint256 amount) internal {
         // TODO : Check callContractWithTokenExpress()
         if (amount != 0) {

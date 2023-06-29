@@ -19,6 +19,9 @@ script-axelar-bnb-topuptoken:
 script-axelar-bnb-revert:
 	forge script script/axelar/AxelarCalls.s.sol:AxelarRevert --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
+script-axelar-bnb-reverttoken:
+	forge script script/axelar/AxelarCalls.s.sol:AxelarRevertToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+
 script-deploy-axelar-bnb-sender:
 	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
 
