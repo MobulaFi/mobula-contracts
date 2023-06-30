@@ -16,6 +16,7 @@ error NotSortingListing(Token token, ListingStatus status);
 error NotUpdatingListing(Token token, ListingStatus status);
 error NotValidationListing(Token token, ListingStatus status);
 error TokenInCooldown(Token token);
+error SubmitterInCooldown(address submitter);
 error InvalidScoreValue();
 error InsufficientProtocolBalance(uint256 protocolBalance, uint256 amountToWithdraw);
 error NothingToClaim(address claimer);

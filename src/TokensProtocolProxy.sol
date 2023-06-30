@@ -11,18 +11,6 @@ import "./lib/ProtocolErrors.sol";
 import "./lib/TokenStructs.sol";
 import "./lib/AxelarStructs.sol";
 
-/*
-    SUGGESTIONS :
-    - Add a cooldown for whitelisted submitters
-        -> MOBL could be farmed by malicious whitelisted submitters
-    - Init ProtocolAPI at launch
-    - Pausable ?
-
-    QUESTIONS :
-    - When update token.lastUpdate ?
-
-*/
-
 contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
 
     /* Modifiers */
@@ -54,8 +42,12 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev whitelistedSubmitter Does this user needs to pay for a Token submission
+     * @dev whitelistedLastSubmit Timestamp last submission
+     * @dev whitelistedCooldown Minimum time required between two Token submission for whitelisted users
      */
     mapping(address => bool) public whitelistedSubmitter;
+    mapping(address => uint256) public whitelistedLastSubmit;
+    uint256 public whitelistedCooldown;
 
     /**
      * @dev submitFloorPrice Minimim price to pay for a listing
@@ -612,6 +604,10 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         voteCooldown = _voteCooldown;
     }
 
+    function updateWhitelistedCooldown(uint256 _whitelistedCooldown) external onlyOwner {
+        whitelistedCooldown = _whitelistedCooldown;
+    }
+
     /* Funds Management */
 
     /**
@@ -711,8 +707,10 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         uint256 coeff;
         ListingStatus status = ListingStatus.Pool;
 
-        if (whitelistedSubmitter[msg.sender]) {
+        if (whitelistedSubmitter[sourceMsgSender]) {
+            if (whitelistedLastSubmit[sourceMsgSender] > block.timestamp - whitelistedCooldown) revert SubmitterInCooldown(sourceMsgSender);
             coeff = PAYMENT_COEFF;
+            whitelistedLastSubmit[sourceMsgSender] = block.timestamp;
         } else if (paymentAmount != 0) {
             // If method was called from another chain
             if (msg.sender != sourceMsgSender) {
