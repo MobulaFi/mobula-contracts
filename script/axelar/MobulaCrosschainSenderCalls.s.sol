@@ -3,11 +3,11 @@ pragma solidity 0.8.19;
 
 import "./Base.s.sol";
 
-import "src/axelar/AxelarSender.sol";
+import "src/MobulaCrosschainSender.sol";
 
 import "src/interfaces/IERC20Extended.sol";
 
-contract AxelarSubmitToken is Base {
+contract MobulaCrosschainSenderSubmitToken is Base {
     function setUp() public {}
 
     function run() external {
@@ -21,13 +21,13 @@ contract AxelarSubmitToken is Base {
         
         paymentToken.approve(senderContract, amount);
 
-        AxelarSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", BUSDC, paymentAmount);
+        MobulaCrosschainSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", BUSDC, paymentAmount);
 
         vm.stopBroadcast();
     }
 }
 
-contract AxelarUpdateToken is Base {
+contract MobulaCrosschainSenderUpdateToken is Base {
     function setUp() public {}
 
     function run() external {
@@ -35,13 +35,13 @@ contract AxelarUpdateToken is Base {
 
         uint256 amountGas = 1e16;
 
-        AxelarSender(senderContract).updateTokenAxelar{value: amountGas}(1234, "testIpfsHash");
+        MobulaCrosschainSender(senderContract).updateTokenAxelar{value: amountGas}(1234, "testIpfsHash");
 
         vm.stopBroadcast();
     }
 }
 
-contract AxelarTopUpToken is Base {
+contract MobulaCrosschainSenderTopUpToken is Base {
     function setUp() public {}
 
     function run() external {
@@ -55,7 +55,7 @@ contract AxelarTopUpToken is Base {
         
         paymentToken.approve(senderContract, amount);
 
-        AxelarSender(senderContract).topUpTokenAxelar{value: amountGas}(1234, BUSDC, paymentAmount);
+        MobulaCrosschainSender(senderContract).topUpTokenAxelar{value: amountGas}(1234, BUSDC, paymentAmount);
 
         vm.stopBroadcast();
     }

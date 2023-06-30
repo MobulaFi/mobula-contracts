@@ -11,7 +11,7 @@ import "./lib/ProtocolErrors.sol";
 import "./lib/TokenStructs.sol";
 import "./lib/AxelarStructs.sol";
 
-contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
+contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /* Modifiers */
     /**
@@ -709,8 +709,9 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
 
         if (whitelistedSubmitter[sourceMsgSender]) {
             if (whitelistedLastSubmit[sourceMsgSender] > block.timestamp - whitelistedCooldown) revert SubmitterInCooldown(sourceMsgSender);
-            coeff = PAYMENT_COEFF;
             whitelistedLastSubmit[sourceMsgSender] = block.timestamp;
+
+            coeff = PAYMENT_COEFF;
         } else if (paymentAmount != 0) {
             // If method was called from another chain
             if (msg.sender != sourceMsgSender) {
@@ -737,9 +738,9 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         tokenListings.push(listing);
         token.id = tokenListings.length - 1;
 
-        _updateListingStatus(token.id, status);
-
         emit TokenListingSubmitted(sourceMsgSender, listing);
+        
+        _updateListingStatus(token.id, status);
     }
 
     /**
@@ -923,6 +924,11 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         coeff = _getCoeff(paymentAmount);
     }
 
+    /**
+     * @dev Get the coeff for a payment amount
+     * @param paymentAmount Amount paid (without decimals)
+     * @return coeff Coeff to add to the listing
+     */
     function _getCoeff(uint256 paymentAmount) internal view returns (uint256 coeff) {
         coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
     }

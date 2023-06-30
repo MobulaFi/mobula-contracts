@@ -3,15 +3,15 @@ pragma solidity 0.8.19;
 
 import "./Base.s.sol";
 
-import "src/axelar/AxelarSender.sol";
+import "src/MobulaCrosschainSender.sol";
 
-contract DeployAxelarSenderArbitrum is Base {
+contract DeployMobulaCrosschainSenderArbitrum is Base {
     function setUp() public {}
 
     function run() external {
         vm.startBroadcast(deployerArbitrumPK);
 
-        AxelarSender sender = new AxelarSender(axelarArbitrumGateway, axelarArbitrumGas);
+        MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarArbitrumGateway, axelarArbitrumGas);
 
         string memory destinationChain = "Polygon";
         sender.setDestination(destinationChain, toAsciiString(receiverContract));
@@ -20,13 +20,13 @@ contract DeployAxelarSenderArbitrum is Base {
     }
 }
 
-contract DeployAxelarSenderBNB is Base {
+contract DeployMobulaCrosschainSenderBNB is Base {
     function setUp() public {}
 
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        AxelarSender sender = new AxelarSender(axelarBNBGateway, axelarBNBGas);
+        MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarBNBGateway, axelarBNBGas);
 
         // B-USDC
         sender.whitelistStable(BUSDC, true);
@@ -38,13 +38,13 @@ contract DeployAxelarSenderBNB is Base {
     }
 }
 
-contract DeployAxelarSenderPolygon is Base {
+contract DeployMobulaCrosschainSenderPolygon is Base {
     function setUp() public {}
 
     function run() external {
         vm.startBroadcast(deployerPolygonPK);
 
-        AxelarSender sender = new AxelarSender(axelarPolygonGateway, axelarPolygonGas);
+        MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarPolygonGateway, axelarPolygonGas);
 
         string memory destinationChain = "Polygon";
         sender.setDestination(destinationChain, toAsciiString(receiverContract));

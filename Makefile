@@ -8,25 +8,22 @@
 #
 
 script-axelar-bnb-updatetoken:
-	forge script script/axelar/AxelarCalls.s.sol:AxelarUpdateToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+	forge script script/axelar/MobulaCrosschainSenderCalls.s.sol:MobulaCrosschainSenderUpdateToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
 script-axelar-bnb-submittoken:
-	forge script script/axelar/AxelarCalls.s.sol:AxelarSubmitToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+	forge script script/axelar/MobulaCrosschainSenderCalls.s.sol:MobulaCrosschainSenderSubmitToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
 script-axelar-bnb-topuptoken:
-	forge script script/axelar/AxelarCalls.s.sol:AxelarTopUpToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
-
-script-axelar-bnb-revert:
-	forge script script/axelar/AxelarCalls.s.sol:AxelarRevert --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
+	forge script script/axelar/MobulaCrosschainSenderCalls.s.sol:MobulaCrosschainSenderTopUpToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
 script-deploy-axelar-bnb-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployMobulaCrosschainSender.s.sol:DeployMobulaCrosschainSenderBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-polygon-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderPolygon --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployMobulaCrosschainSender.s.sol:DeployMobulaCrosschainSenderPolygon --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-arbitrum-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderArbitrum --rpc-url ${ARBITRUM_RPC_URL} --broadcast --verify --chain-id 42161 --etherscan-api-key ${ARBISCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployMobulaCrosschainSender.s.sol:DeployMobulaCrosschainSenderArbitrum --rpc-url ${ARBITRUM_RPC_URL} --broadcast --verify --chain-id 42161 --etherscan-api-key ${ARBISCAN_API_KEY} -vvvv
 
 script-deploy-axelar-bnb-receiver:
 	forge script script/axelar/DeployAxelarReceiver.s.sol:DeployAxelarReceiverBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv

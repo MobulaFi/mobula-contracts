@@ -49,11 +49,6 @@ contract API is Ownable2Step {
         assets.push(token);
         assetById[token.id] = token;
 
-        // TODO : Refacto
-        // for (uint256 i = 0; i < token.contractAddresses.length; i++) {
-        //     staticData[token.contractAddresses[i]] = token.ipfsHash;
-        // }
-
         emit NewAssetListing(token);
     }
 
