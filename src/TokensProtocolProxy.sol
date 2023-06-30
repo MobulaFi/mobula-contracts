@@ -17,7 +17,6 @@ import "./lib/AxelarStructs.sol";
         -> MOBL could be farmed by malicious whitelisted submitters
     - Init ProtocolAPI at launch
     - Pausable ?
-    - Owner should be able to force status change (for example, if listing already paid elsewhere)
 
     QUESTIONS :
     - When update token.lastUpdate ?
@@ -488,6 +487,15 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
      */
     function emergencyKillRequest(uint256 tokenId) external onlyOwner {
         _updateListingStatus(tokenId, ListingStatus.Killed);
+    }
+
+    /**
+     * @dev Allows the owner to change a Token listing status
+     * @param tokenId ID of the Token
+     * @param status New status of the listing
+     */
+     function emergencyUpdateListingStatus(uint256 tokenId, ListingStatus status) external onlyOwner {
+        _updateListingStatus(tokenId, status);
     }
 
     /* Protocol Management */
