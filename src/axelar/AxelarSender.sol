@@ -6,7 +6,7 @@ import "@axelar/contracts/interfaces/IAxelarGasService.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./AxelarStructs.sol";
+// import "./AxelarStructs.sol";
 
 import "../lib/ProtocolErrors.sol";
 import "../interfaces/IERC20Extended.sol";
@@ -70,14 +70,6 @@ contract AxelarSender is AxelarExecutable, Ownable {
         }
 
         bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, paymentTokenAddress, "", tokenId, paymentAmount));
-
-        _sendCrosschain(payload);
-    }
-
-    function revertAxelar(string memory message) external payable {
-        require(msg.value > 0, 'Gas payment is required');
-
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, address(0), message, 0, 0));
 
         _sendCrosschain(payload);
     }

@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@axelar/contracts/executable/AxelarExecutable.sol";
 
 import "./interfaces/IAPI.sol";
 import "./interfaces/IERC20Extended.sol";
 
 import "./lib/ProtocolErrors.sol";
 import "./lib/TokenStructs.sol";
+import "./lib/AxelarStructs.sol";
 
 /*
     SUGGESTIONS :
@@ -20,11 +21,10 @@ import "./lib/TokenStructs.sol";
 
     QUESTIONS :
     - When update token.lastUpdate ?
-    - Can somebody pay with MATIC ? Why does the user can chose assetId ?
 
 */
 
-contract TokensProtocolProxy is Initializable, Ownable2Step {
+contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
 
     /* Modifiers */
     /**
@@ -184,7 +184,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /* Events */
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
     event TokenDetailsUpdated(Token token);
-    event TokenListingFunded(TokenListing tokenListing, uint256 amount);
+    event TokenListingFunded(address indexed funder, TokenListing tokenListing, uint256 amount);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
     event ERC20FundsWithdrawn(address indexed recipient, address indexed contractAddress, uint256 amount);
@@ -195,10 +195,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     event ValidationVote(Token token, address voter, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore);
     event TokenValidated(Token token);
 
-    function initialize(address _owner, address _mobulaToken)
-        public
-        initializer
-    {
+    constructor(address gateway_, address _owner, address _mobulaToken) AxelarExecutable(gateway_) {
         _transferOwnership(_owner);
         mobulaToken = _mobulaToken;
     }
@@ -253,21 +250,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param ipfsHash New IPFS hash of the Token
      */
     function updateToken(uint256 tokenId, string memory ipfsHash) external {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
-
-        TokenListing storage listing = tokenListings[tokenId];
-
-        if (listing.status != ListingStatus.Updating) revert NotUpdatingListing(listing.token, listing.status);
-
-        if (listing.submitter != msg.sender) revert InvalidUpdatingUser(msg.sender, listing.submitter);
-
-        listing.token.ipfsHash = ipfsHash;
-        listing.token.lastUpdate = block.timestamp;
-
-        emit TokenDetailsUpdated(listing.token);
-        
-        // We put the Token back to Sorting (impossible to be in Pool status)
-        _updateListingStatus(tokenId, ListingStatus.Sorting);
+        _updateToken(tokenId, ipfsHash, msg.sender);
     }
 
     /**
@@ -276,38 +259,8 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      */
-    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount)
-        external
-    {
-        uint256 coeff;
-        ListingStatus status = ListingStatus.Pool;
-
-        if (whitelistedSubmitter[msg.sender]) {
-            coeff = PAYMENT_COEFF;
-        } else if (paymentAmount != 0) {
-            coeff = _payment(paymentTokenAddress, paymentAmount);
-        }
-
-        if (coeff >= PAYMENT_COEFF) {
-            status = ListingStatus.Sorting;
-        }
-
-        Token memory token;
-        token.ipfsHash = ipfsHash;
-        token.lastUpdate = block.timestamp;
-        
-        TokenListing memory listing;
-        listing.token = token;
-        listing.coeff = coeff;
-        listing.submitter = msg.sender;
-        listing.phase = 1;
-
-        tokenListings.push(listing);
-        token.id = tokenListings.length - 1;
-
-        _updateListingStatus(token.id, status);
-
-        emit TokenListingSubmitted(msg.sender, listing);
+    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external {
+        _submitToken(ipfsHash, paymentTokenAddress, paymentAmount, msg.sender);
     }
 
     /**
@@ -317,16 +270,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param paymentAmount Amount to be paid (without decimals)
      */
     function topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
-        if (paymentAmount == 0) revert InvalidPaymentAmount();
-
-        tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
-
-        emit TokenListingFunded(tokenListings[tokenId], paymentAmount);
-
-        if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
-            _updateListingStatus(tokenId, ListingStatus.Sorting);
-        }
+        _topUpToken(tokenId, paymentTokenAddress, paymentAmount, msg.sender);
     }
 
     /**
@@ -346,10 +290,6 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         emit RewardsClaimed(user, moblAmount);
     }
-
-    /* Axelar callbacks */
-
-    // TODO : add Axelar submitHandler
 
     /* Votes */
 
@@ -686,7 +626,103 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         emit ERC20FundsWithdrawn(recipient, contractAddress, amount);
     }
 
+    /* Axelar callbacks */
+
+    function _execute(
+        string calldata,
+        string calldata,
+        bytes calldata payload
+    ) internal override {
+        // TODO : Check that source/address are whitelisted
+        MobulaPayload memory mPayload = abi.decode(payload, (MobulaPayload));
+        
+        if (mPayload.method == MobulaMethod.SubmitToken) {
+            _submitToken(mPayload.ipfsHash, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender);
+        } else if (mPayload.method == MobulaMethod.UpdateToken) {
+            _updateToken(mPayload.tokenId, mPayload.ipfsHash, mPayload.sender);
+        } else if (mPayload.method == MobulaMethod.TopUpToken) {
+            _topUpToken(mPayload.tokenId, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender);
+        } else {
+            revert UnknownMethod(mPayload);
+        }
+    }
+
     /* Internal Methods */
+
+    function _updateToken(uint256 tokenId, string memory ipfsHash, address sourceMsgSender) internal {
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+
+        TokenListing storage listing = tokenListings[tokenId];
+
+        if (listing.status != ListingStatus.Updating) revert NotUpdatingListing(listing.token, listing.status);
+
+        if (listing.submitter != sourceMsgSender) revert InvalidUpdatingUser(sourceMsgSender, listing.submitter);
+
+        listing.token.ipfsHash = ipfsHash;
+        listing.token.lastUpdate = block.timestamp;
+
+        emit TokenDetailsUpdated(listing.token);
+        
+        // We put the Token back to Sorting (impossible to be in Pool status)
+        _updateListingStatus(tokenId, ListingStatus.Sorting);
+    }
+    
+    function _submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender)
+        internal
+    {
+        uint256 coeff;
+        ListingStatus status = ListingStatus.Pool;
+
+        if (whitelistedSubmitter[msg.sender]) {
+            coeff = PAYMENT_COEFF;
+        } else if (paymentAmount != 0) {
+            // If method was called from another chain
+            if (msg.sender != sourceMsgSender) {
+                coeff = _getCoeff(paymentAmount);
+            } else {
+                coeff = _payment(paymentTokenAddress, paymentAmount);
+            }
+        }
+
+        if (coeff >= PAYMENT_COEFF) {
+            status = ListingStatus.Sorting;
+        }
+
+        Token memory token;
+        token.ipfsHash = ipfsHash;
+        token.lastUpdate = block.timestamp;
+        
+        TokenListing memory listing;
+        listing.token = token;
+        listing.coeff = coeff;
+        listing.submitter = sourceMsgSender;
+        listing.phase = 1;
+
+        tokenListings.push(listing);
+        token.id = tokenListings.length - 1;
+
+        _updateListingStatus(token.id, status);
+
+        emit TokenListingSubmitted(sourceMsgSender, listing);
+    }
+
+    function _topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender) internal {
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+        if (paymentAmount == 0) revert InvalidPaymentAmount();
+
+        // If method was called from another chain
+        if (msg.sender != sourceMsgSender) {
+            tokenListings[tokenId].coeff += _getCoeff(paymentAmount);
+        } else {
+            tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
+        }
+
+        emit TokenListingFunded(sourceMsgSender, tokenListings[tokenId], paymentAmount);
+
+        if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
+            _updateListingStatus(tokenId, ListingStatus.Sorting);
+        }
+    }
 
     /**
      * @dev Update the status of a listing, by moving the listing/token index from one status array to another one
@@ -841,6 +877,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
 
         if (!success) revert TokenPaymentFailed(paymentTokenAddress, amount);
 
+        coeff = _getCoeff(paymentAmount);
+    }
+
+    function _getCoeff(uint256 paymentAmount) internal view returns (uint256 coeff) {
         coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
     }
 

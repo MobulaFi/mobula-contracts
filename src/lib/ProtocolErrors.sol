@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "./AxelarStructs.sol";
 import "./TokenStructs.sol";
 
 // TODO : Add NatSpec + Token to tokenId ?
@@ -27,3 +28,4 @@ error RankDemotionImpossible(uint256 userRank, uint256 minCurrentRank);
 error NoDemotionYet(uint256 fromRank);
 error InvalidPercentage(uint256 percentage);
 error InvalidStatusUpdate(Token token, ListingStatus currentStatus, ListingStatus targetStatus);
+error UnknownMethod(MobulaPayload payload);

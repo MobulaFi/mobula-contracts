@@ -60,17 +60,3 @@ contract AxelarTopUpToken is Base {
         vm.stopBroadcast();
     }
 }
-
-contract AxelarRevert is Base {
-    function setUp() public {}
-
-    function run() external {
-        vm.startBroadcast(deployerBNBPK);
-
-        uint256 amountGas = 1e16;
-
-        AxelarSender(senderContract).revertAxelar{value: amountGas}("testRevertMessage");
-
-        vm.stopBroadcast();
-    }
-}
