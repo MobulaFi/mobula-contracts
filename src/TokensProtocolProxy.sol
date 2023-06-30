@@ -64,6 +64,11 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
     uint256 public submitFloorPrice;
 
     /**
+     * @dev whitelistedAxelarContract Does an address on a blockchain is whitelisted
+     */
+    mapping(string => mapping(string => bool)) public whitelistedAxelarContract;
+
+    /**
      * @dev tokenListings All Token Listings
      */
     TokenListing[] public tokenListings;
@@ -486,13 +491,18 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
     }
 
     /* Protocol Management */
-    // TODO : Add NatSpec
-    function toggleWhitelistedStable(address _stableAddress) external onlyOwner {
-        whitelistedStable[_stableAddress] = !whitelistedStable[_stableAddress];
+    // TODO : Add NatSpec + Events ?
+
+    function whitelistStable(address _stableAddress, bool whitelisted) external onlyOwner {
+        whitelistedStable[_stableAddress] = whitelisted;
     }
 
-    function toggleWhitelistedSubmitter(address _submitter) external onlyOwner {
-        whitelistedSubmitter[_submitter] = !whitelistedSubmitter[_submitter];
+    function whitelistSubmitter(address _submitter, bool whitelisted) external onlyOwner {
+        whitelistedSubmitter[_submitter] = whitelisted;
+    }
+
+    function whitelistAxelarContract(string memory _sourceChain, string memory _sourceAddress, bool whitelisted) external onlyOwner {
+        whitelistedAxelarContract[_sourceChain][_sourceAddress] = whitelisted;
     }
 
     function updateProtocolAPIAddress(address _protocolAPI) external onlyOwner {
@@ -626,14 +636,21 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         emit ERC20FundsWithdrawn(recipient, contractAddress, amount);
     }
 
-    /* Axelar callbacks */
+    /* Axelar callback */
 
+    /**
+     * @dev Execute a cross chain call from Axelar
+     * @param sourceChain Source blockchain
+     * @param sourceAddress Source smart contract address
+     * @param payload Payload
+     */
     function _execute(
-        string calldata,
-        string calldata,
+        string calldata sourceChain,
+        string calldata sourceAddress,
         bytes calldata payload
     ) internal override {
-        // TODO : Check that source/address are whitelisted
+        if (!whitelistedAxelarContract[sourceChain][sourceAddress]) revert InvalidAxelarContract(sourceChain, sourceAddress);
+
         MobulaPayload memory mPayload = abi.decode(payload, (MobulaPayload));
         
         if (mPayload.method == MobulaMethod.SubmitToken) {
@@ -649,6 +666,12 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
 
     /* Internal Methods */
 
+    /**
+     * @dev Allows the submitter of a Token to update Token details
+     * @param tokenId ID of the Token to update
+     * @param ipfsHash New IPFS hash of the Token
+     * @param sourceMsgSender Sender of the tx
+     */
     function _updateToken(uint256 tokenId, string memory ipfsHash, address sourceMsgSender) internal {
         if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
 
@@ -667,6 +690,13 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         _updateListingStatus(tokenId, ListingStatus.Sorting);
     }
     
+    /**
+     * @dev Allows a user to submit a Token for validation
+     * @param ipfsHash IPFS hash of the Token
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     * @param sourceMsgSender Sender of the tx
+     */
     function _submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender)
         internal
     {
@@ -706,6 +736,13 @@ contract TokensProtocolProxy is AxelarExecutable, Ownable2Step {
         emit TokenListingSubmitted(sourceMsgSender, listing);
     }
 
+    /**
+     * @dev Allows a user to top up listing payment
+     * @param tokenId ID of the Token to top up
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     * @param sourceMsgSender Sender of the tx
+     */
     function _topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender) internal {
         if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
         if (paymentAmount == 0) revert InvalidPaymentAmount();

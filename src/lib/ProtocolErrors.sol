@@ -29,3 +29,4 @@ error NoDemotionYet(uint256 fromRank);
 error InvalidPercentage(uint256 percentage);
 error InvalidStatusUpdate(Token token, ListingStatus currentStatus, ListingStatus targetStatus);
 error UnknownMethod(MobulaPayload payload);
+error InvalidAxelarContract(string sourceChain, string sourceAddress);
