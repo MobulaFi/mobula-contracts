@@ -184,8 +184,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     /* Events */
     event TokenListingSubmitted(address submitter, TokenListing tokenListing);
     event TokenDetailsUpdated(Token token);
+    event TokenListingFunded(TokenListing tokenListing, uint256 amount);
     event RewardsClaimed(address indexed claimer, uint256 amount);
     event FundsWithdrawn(address indexed recipient, uint256 amount);
+    event ERC20FundsWithdrawn(address indexed recipient, address indexed contractAddress, uint256 amount);
     event UserPromoted(address indexed promoted, uint256 newRank);
     event UserDemoted(address indexed demoted, uint256 newRank);
     event ListingStatusUpdated(Token token, ListingStatus previousStatus, ListingStatus newStatus);
@@ -251,19 +253,13 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param ipfsHash New IPFS hash of the Token
      */
     function updateToken(uint256 tokenId, string memory ipfsHash) external {
-        if (tokenId >= tokenListings.length) {
-            revert TokenNotFound(tokenId);
-        }
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
 
         TokenListing storage listing = tokenListings[tokenId];
 
-        if (listing.status != ListingStatus.Updating) {
-            revert NotUpdatingListing(listing.token, listing.status);
-        }
+        if (listing.status != ListingStatus.Updating) revert NotUpdatingListing(listing.token, listing.status);
 
-        if (listing.submitter != msg.sender) {
-            revert InvalidUpdatingUser(msg.sender, listing.submitter);
-        }
+        if (listing.submitter != msg.sender) revert InvalidUpdatingUser(msg.sender, listing.submitter);
 
         listing.token.ipfsHash = ipfsHash;
         listing.token.lastUpdate = block.timestamp;
@@ -321,16 +317,12 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @param paymentAmount Amount to be paid (without decimals)
      */
     function topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external {
-        if (tokenId >= tokenListings.length) {
-            revert TokenNotFound(tokenId);
-        }
-        if (paymentAmount == 0) {
-            revert InvalidPaymentAmount();
-        }
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+        if (paymentAmount == 0) revert InvalidPaymentAmount();
 
         tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
 
-        // TODO : Event ?
+        emit TokenListingFunded(tokenListings[tokenId], paymentAmount);
 
         if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
             _updateListingStatus(tokenId, ListingStatus.Sorting);
@@ -343,9 +335,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function claimRewards(address user) external {
         uint256 amountToPay = owedRewards[user] * tokensPerVote;
-        if (amountToPay == 0) {
-            revert NothingToClaim(user);
-        }
+        if (amountToPay == 0) revert NothingToClaim(user);
 
         paidRewards[user] += amountToPay;
         delete owedRewards[user];
@@ -375,22 +365,15 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         external
         onlyRanked
     {
-        if (tokenId >= tokenListings.length) {
-            revert TokenNotFound(tokenId);
-        }
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+
         TokenListing storage listing = tokenListings[tokenId];
 
-        if (listing.status != ListingStatus.Sorting) {
-            revert NotSortingListing(listing.token, listing.status);
-        }
+        if (listing.status != ListingStatus.Sorting) revert NotSortingListing(listing.token, listing.status);
 
-        if (listing.token.lastUpdate > block.timestamp - voteCooldown) {
-            revert TokenInCooldown(listing.token);
-        }
+        if (listing.token.lastUpdate > block.timestamp - voteCooldown) revert TokenInCooldown(listing.token);
 
-        if (sortingVotesPhase[tokenId][msg.sender] >= listing.phase) {
-            revert AlreadyVoted(msg.sender, listing.status, listing.phase);
-        }
+        if (sortingVotesPhase[tokenId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
 
         sortingVotesPhase[tokenId][msg.sender] = listing.phase;
 
@@ -399,9 +382,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         } else if (vote == ListingVote.Reject) {
             sortingRejections[tokenId].push(msg.sender);
         } else {
-            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
-                revert InvalidScoreValue();
-            }
+            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) revert InvalidScoreValue();
 
             sortingAcceptances[tokenId].push(msg.sender);
 
@@ -435,18 +416,13 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         external
         onlyRankII
     {
-        if (tokenId >= tokenListings.length) {
-            revert TokenNotFound(tokenId);
-        }
+        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+
         TokenListing storage listing = tokenListings[tokenId];
 
-        if (listing.status != ListingStatus.Validation) {
-            revert NotValidationListing(listing.token, listing.status);
-        }
+        if (listing.status != ListingStatus.Validation) revert NotValidationListing(listing.token, listing.status);
 
-        if (validationVotesPhase[tokenId][msg.sender] >= listing.phase) {
-            revert AlreadyVoted(msg.sender, listing.status, listing.phase);
-        }
+        if (validationVotesPhase[tokenId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
 
         validationVotesPhase[tokenId][msg.sender] = listing.phase;
 
@@ -455,9 +431,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         } else if (vote == ListingVote.Reject) {
             validationRejections[tokenId].push(msg.sender);
         } else {
-            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) {
-                revert InvalidScoreValue();
-            }
+            if (utilityScore > 5 || socialScore > 5 || trustScore > 5) revert InvalidScoreValue();
 
             validationAcceptances[tokenId].push(msg.sender);
 
@@ -493,14 +467,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function promote(address promoted) external onlyRankII {
         uint256 rankPromoted = rank[promoted];
-        if (rankPromoted > 1) {
-            revert RankPromotionImpossible(rankPromoted, 1);
-        }
+        if (rankPromoted > 1) revert RankPromotionImpossible(rankPromoted, 1);
 
         if (rankPromoted == 0) {
-            if (membersToPromoteToRankI == 0) {
-                revert NoPromotionYet(1);
-            }
+            if (membersToPromoteToRankI == 0) revert NoPromotionYet(1);
             ++promoteVotes[promoted];
 
             if (promoteVotes[promoted] == votesNeededToRankIPromotion) {
@@ -508,9 +478,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
                 _promote(promoted);
             }
         } else {
-            if (membersToPromoteToRankII == 0) {
-                revert NoPromotionYet(2);
-            }
+            if (membersToPromoteToRankII == 0) revert NoPromotionYet(2);
             ++promoteVotes[promoted];
 
             if (promoteVotes[promoted] == votesNeededToRankIIPromotion) {
@@ -526,14 +494,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function demote(address demoted) external onlyRankII {
         uint256 rankDemoted = rank[demoted];
-        if (rankDemoted == 0) {
-            revert RankDemotionImpossible(rankDemoted, 1);
-        }
+        if (rankDemoted == 0) revert RankDemotionImpossible(rankDemoted, 1);
 
         if (rankDemoted == 1) {
-            if (membersToDemoteFromRankI == 0) {
-                revert NoDemotionYet(1);
-            }
+            if (membersToDemoteFromRankI == 0) revert NoDemotionYet(1);
             ++demoteVotes[demoted];
 
             if (demoteVotes[demoted] == votesNeededToRankIDemotion) {
@@ -541,9 +505,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
                 _demote(demoted);
             }
         } else {
-            if (membersToDemoteFromRankII == 0) {
-                revert NoDemotionYet(2);
-            }
+            if (membersToDemoteFromRankII == 0) revert NoDemotionYet(2);
             ++demoteVotes[demoted];
 
             if (demoteVotes[demoted] == votesNeededToRankIIDemotion) {
@@ -561,9 +523,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function emergencyPromote(address promoted) external onlyOwner {
         uint256 rankPromoted = rank[promoted];
-        if (rankPromoted > 1) {
-            revert RankPromotionImpossible(rankPromoted, 1);
-        }
+        if (rankPromoted > 1) revert RankPromotionImpossible(rankPromoted, 1);
         _promote(promoted);
     }
 
@@ -573,9 +533,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function emergencyDemote(address demoted) external onlyOwner {
         uint256 rankDemoted = rank[demoted];
-        if (rankDemoted == 0) {
-            revert RankDemotionImpossible(rankDemoted, 1);
-        }
+        if (rankDemoted == 0) revert RankDemotionImpossible(rankDemoted, 1);
         _demote(demoted);
     }
 
@@ -617,30 +575,22 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     }
 
     function updateSortingMinAcceptancesPct(uint256 _sortingMinAcceptancesPct) external onlyOwner {
-        if (_sortingMinAcceptancesPct > 100) {
-            revert InvalidPercentage(_sortingMinAcceptancesPct);
-        }
+        if (_sortingMinAcceptancesPct > 100) revert InvalidPercentage(_sortingMinAcceptancesPct);
         sortingMinAcceptancesPct = _sortingMinAcceptancesPct;
     }
 
     function updateSortingMinModificationsPct(uint256 _sortingMinModificationsPct) external onlyOwner {
-        if (_sortingMinModificationsPct > 100) {
-            revert InvalidPercentage(_sortingMinModificationsPct);
-        }
+        if (_sortingMinModificationsPct > 100) revert InvalidPercentage(_sortingMinModificationsPct);
         sortingMinModificationsPct = _sortingMinModificationsPct;
     }
 
     function updateValidationMinAcceptancesPct(uint256 _validationMinAcceptancesPct) external onlyOwner {
-        if (_validationMinAcceptancesPct > 100) {
-            revert InvalidPercentage(_validationMinAcceptancesPct);
-        }
+        if (_validationMinAcceptancesPct > 100) revert InvalidPercentage(_validationMinAcceptancesPct);
         validationMinAcceptancesPct = _validationMinAcceptancesPct;
     }
 
     function updateValidationMinModificationsPct(uint256 _validationMinModificationsPct) external onlyOwner {
-        if (_validationMinModificationsPct > 100) {
-            revert InvalidPercentage(_validationMinModificationsPct);
-        }
+        if (_validationMinModificationsPct > 100) revert InvalidPercentage(_validationMinModificationsPct);
         validationMinModificationsPct = _validationMinModificationsPct;
     }
 
@@ -713,13 +663,12 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function withdrawFunds(address recipient, uint256 amount) external onlyOwner {
         uint256 protocolBalance = address(this).balance;
-        if (amount > protocolBalance) {
-            revert InsufficientProtocolBalance(protocolBalance, amount);
-        }
+        if (amount > protocolBalance) revert InsufficientProtocolBalance(protocolBalance, amount);
+
         (bool success,) = recipient.call{value: amount}("");
-        if (!success) {
-            revert ETHTransferFailed(recipient);
-        }
+
+        if (!success) revert ETHTransferFailed(recipient);
+
         emit FundsWithdrawn(recipient, amount);
     }
 
@@ -731,10 +680,10 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      */
     function withdrawERC20Funds(address recipient, uint256 amount, address contractAddress) external onlyOwner {
         bool success = IERC20Extended(contractAddress).transfer(recipient, amount);
-        if (!success) {
-            revert ERC20WithdrawFailed(contractAddress, recipient, amount);
-        }
-        // TODO : Event ?
+
+        if (!success) revert ERC20WithdrawFailed(contractAddress, recipient, amount);
+
+        emit ERC20FundsWithdrawn(recipient, contractAddress, amount);
     }
 
     /* Internal Methods */
@@ -747,15 +696,12 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
     function _updateListingStatus(uint256 tokenId, ListingStatus status) internal {
         TokenListing storage listing = tokenListings[tokenId];
 
-        if (status == ListingStatus.Init) {
-            revert InvalidStatusUpdate(listing.token, listing.status, status);
-        }
+        if (status == ListingStatus.Init) revert InvalidStatusUpdate(listing.token, listing.status, status);
 
         if (listing.status != ListingStatus.Init) {
             // Can only be updated to Pool status, if current status is Init
-            if (status == ListingStatus.Pool) {
-                revert InvalidStatusUpdate(listing.token, listing.status, status);
-            }
+            if (status == ListingStatus.Pool) revert InvalidStatusUpdate(listing.token, listing.status, status);
+
             // Remove listing from current status array
             uint256[] storage fromArray = _getStorageArrayForStatus(listing.status);
             uint256 indexMovedListing = fromArray[fromArray.length - 1];
@@ -887,19 +833,14 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
      * @return coeff Coeff to add to the listing
      */
     function _payment(address paymentTokenAddress, uint256 paymentAmount) internal returns (uint256 coeff) {
-        if (!whitelistedStable[paymentTokenAddress]) {
-            revert InvalidPaymentToken(paymentTokenAddress);
-        }
+        if (!whitelistedStable[paymentTokenAddress]) revert InvalidPaymentToken(paymentTokenAddress);
 
         IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
         uint256 amount = paymentAmount * 10**paymentToken.decimals();
         bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
 
-        if (!success) {
-            revert TokenPaymentFailed(paymentTokenAddress, amount);
-        }
+        if (!success) revert TokenPaymentFailed(paymentTokenAddress, amount);
 
-        // TODO : How is it handled if stablecoins have different decimals count
         coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
     }
 
