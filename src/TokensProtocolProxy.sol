@@ -16,6 +16,7 @@ import "./lib/TokenStructs.sol";
         -> MOBL could be farmed by malicious whitelisted submitters
     - Init ProtocolAPI at launch
     - Pausable ?
+    - Owner should be able to force status change (for example, if listing already paid elsewhere)
 
     QUESTIONS :
     - When update token.lastUpdate ?
@@ -733,6 +734,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
         if (!success) {
             revert ERC20WithdrawFailed(contractAddress, recipient, amount);
         }
+        // TODO : Event ?
     }
 
     /* Internal Methods */
@@ -897,6 +899,7 @@ contract TokensProtocolProxy is Initializable, Ownable2Step {
             revert TokenPaymentFailed(paymentTokenAddress, amount);
         }
 
+        // TODO : How is it handled if stablecoins have different decimals count
         coeff = (paymentAmount * PAYMENT_COEFF) / submitFloorPrice;
     }
 

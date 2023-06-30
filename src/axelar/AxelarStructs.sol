@@ -11,6 +11,8 @@ enum MobulaMethod {
 struct MobulaPayload {
     MobulaMethod method;
     address sender;
+    address paymentTokenAddress;
     string ipfsHash;
     uint256 tokenId;
+    uint256 paymentAmount;
 }

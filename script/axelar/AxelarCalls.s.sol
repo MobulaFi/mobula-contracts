@@ -5,7 +5,7 @@ import "./Base.s.sol";
 
 import "src/axelar/AxelarSender.sol";
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "src/interfaces/IERC20Extended.sol";
 
 contract AxelarSubmitToken is Base {
     function setUp() public {}
@@ -13,18 +13,15 @@ contract AxelarSubmitToken is Base {
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        address axlUSDC = 0x4268B8F0B87b6Eae5d897996E6b845ddbD99Adf3;
         uint256 amountGas = 1e16;
 
-        string memory destinationChain = "Polygon";
-        string memory symbol = "axlUSDC";
-        uint256 amount = 12345;
+        IERC20Extended paymentToken = IERC20Extended(BUSDC);
+        uint256 paymentAmount = 1;
+        uint256 amount = paymentAmount * 10**paymentToken.decimals();
         
-        IERC20(axlUSDC).approve(senderContract, amount);
+        paymentToken.approve(senderContract, amount);
 
-        AxelarSender(senderContract).setDestination(destinationChain, toAsciiString(receiverContract));
-
-        AxelarSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", symbol, amount);
+        AxelarSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", BUSDC, paymentAmount);
 
         vm.stopBroadcast();
     }
@@ -36,10 +33,7 @@ contract AxelarUpdateToken is Base {
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        string memory destinationChain = "Polygon";
         uint256 amountGas = 1e16;
-
-        AxelarSender(senderContract).setDestination(destinationChain, toAsciiString(receiverContract));
 
         AxelarSender(senderContract).updateTokenAxelar{value: amountGas}(1234, "testIpfsHash");
 
@@ -53,18 +47,15 @@ contract AxelarTopUpToken is Base {
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        address axlUSDC = 0x4268B8F0B87b6Eae5d897996E6b845ddbD99Adf3;
         uint256 amountGas = 1e16;
 
-        string memory destinationChain = "Polygon";
-        string memory symbol = "axlUSDC";
-        uint256 amount = 12345;
+        IERC20Extended paymentToken = IERC20Extended(BUSDC);
+        uint256 paymentAmount = 1;
+        uint256 amount = paymentAmount * 10**paymentToken.decimals();
         
-        IERC20(axlUSDC).approve(senderContract, amount);
+        paymentToken.approve(senderContract, amount);
 
-        AxelarSender(senderContract).setDestination(destinationChain, toAsciiString(receiverContract));
-
-        AxelarSender(senderContract).topUpTokenAxelar{value: amountGas}(1234, symbol, amount);
+        AxelarSender(senderContract).topUpTokenAxelar{value: amountGas}(1234, BUSDC, paymentAmount);
 
         vm.stopBroadcast();
     }
@@ -76,35 +67,9 @@ contract AxelarRevert is Base {
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        string memory destinationChain = "Polygon";
         uint256 amountGas = 1e16;
-
-        AxelarSender(senderContract).setDestination(destinationChain, toAsciiString(receiverContract));
 
         AxelarSender(senderContract).revertAxelar{value: amountGas}("testRevertMessage");
-
-        vm.stopBroadcast();
-    }
-}
-
-contract AxelarRevertToken is Base {
-    function setUp() public {}
-
-    function run() external {
-        vm.startBroadcast(deployerBNBPK);
-
-        address axlUSDC = 0x4268B8F0B87b6Eae5d897996E6b845ddbD99Adf3;
-        uint256 amountGas = 1e16;
-
-        string memory destinationChain = "Polygon";
-        string memory symbol = "axlUSDC";
-        uint256 amount = 12345;
-        
-        IERC20(axlUSDC).approve(senderContract, amount);
-
-        AxelarSender(senderContract).setDestination(destinationChain, toAsciiString(receiverContract));
-
-        AxelarSender(senderContract).revertPaymentAxelar{value: amountGas}("testRevertMessage", symbol, amount);
 
         vm.stopBroadcast();
     }

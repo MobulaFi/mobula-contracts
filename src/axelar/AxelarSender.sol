@@ -8,24 +8,32 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./AxelarStructs.sol";
 
+import "../lib/ProtocolErrors.sol";
+import "../interfaces/IERC20Extended.sol";
+
 /*
-    CONCERNS :
-    - Should we implement the 'revert' logic here ?
-    - What happen to gas left ? -> refunded minutes after
-    - What happen on a reverted tx on destination chain ?
-    - Use callContractWithTokenExpress() ? -> partnership with axelar probably needed
-    - Need to WL axlTokens
+    TODOs :
+    - How to link payment and token/user ?
 
 */
 
 contract AxelarSender is AxelarExecutable, Ownable {
     IAxelarGasService public immutable gasService;
 
+    /**
+     * @dev whitelistedStable Does an ERC20 stablecoin is whitelisted as listing payment
+     */
+    mapping(address => bool) public whitelistedStable;
+
     string public destinationChain;
     string public destinationAddress;
 
     constructor(address gateway_, address gasReceiver_) AxelarExecutable(gateway_) {
         gasService = IAxelarGasService(gasReceiver_);
+    }
+
+    function whitelistStable(address _stableAddress, bool whitelisted) external onlyOwner {
+        whitelistedStable[_stableAddress] = whitelisted;
     }
 
     function setDestination(string memory _destinationChain, string memory _destinationAddress) external onlyOwner {
@@ -36,70 +44,80 @@ contract AxelarSender is AxelarExecutable, Ownable {
     function updateTokenAxelar(uint256 tokenId, string memory ipfsHash) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.UpdateToken, msg.sender, ipfsHash, tokenId));
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.UpdateToken, msg.sender, address(0), ipfsHash, tokenId, 0));
 
-        _sendCrosschain(payload, "", 0);
+        _sendCrosschain(payload);
     }
     
-    function submitTokenAxelar(string memory ipfsHash, string memory symbol, uint256 paymentAmount) external payable
+    function submitTokenAxelar(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external payable
     {
         require(msg.value > 0, 'Gas payment is required');
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.SubmitToken, msg.sender, ipfsHash, 0));
+        if (paymentAmount != 0) {
+            _payment(paymentTokenAddress, paymentAmount);
+        }
 
-        _sendCrosschain(payload, symbol, paymentAmount);
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.SubmitToken, msg.sender, paymentTokenAddress, ipfsHash, 0, paymentAmount));
+
+        _sendCrosschain(payload);
     }
 
-    function topUpTokenAxelar(uint256 tokenId, string memory symbol, uint256 paymentAmount) external payable {
+    function topUpTokenAxelar(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, "", tokenId));
+        if (paymentAmount != 0) {
+            _payment(paymentTokenAddress, paymentAmount);
+        }
 
-        _sendCrosschain(payload, symbol, paymentAmount);
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, paymentTokenAddress, "", tokenId, paymentAmount));
+
+        _sendCrosschain(payload);
     }
 
     function revertAxelar(string memory message) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, message, 0));
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, address(0), message, 0, 0));
 
-        _sendCrosschain(payload, "", 0);
+        _sendCrosschain(payload);
     }
 
-    function revertPaymentAxelar(string memory message, string memory symbol, uint256 paymentAmount) external payable {
-        require(msg.value > 0, 'Gas payment is required');
-
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TestRevert, msg.sender, message, 0));
-
-        _sendCrosschain(payload, symbol, paymentAmount);
+    /**
+     * @dev Withdraw ERC20 amount to recipient
+     * @param recipient The recipient
+     * @param amount Amount to withdraw
+     * @param contractAddress ERC20 address
+     */
+    function withdrawERC20Funds(address recipient, uint256 amount, address contractAddress) external onlyOwner {
+        bool success = IERC20Extended(contractAddress).transfer(recipient, amount);
+        if (!success) revert ERC20WithdrawFailed(contractAddress, recipient, amount);
     }
 
-    function _sendCrosschain(bytes memory payload, string memory symbol, uint256 amount) internal {
-        // TODO : Check callContractWithTokenExpress()
-        if (amount != 0) {
-            address tokenAddress = gateway.tokenAddresses(symbol);
-            IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
-            IERC20(tokenAddress).approve(address(gateway), amount);
+    /* Internal Methods */
 
-            gasService.payNativeGasForContractCallWithToken{ value: msg.value }(
-                address(this),
-                destinationChain,
-                destinationAddress,
-                payload,
-                symbol,
-                amount,
-                msg.sender
-            );
-            gateway.callContractWithToken(destinationChain, destinationAddress, payload, symbol, amount);
-        } else {
-            gasService.payNativeGasForContractCall{ value: msg.value }(
-                address(this),
-                destinationChain,
-                destinationAddress,
-                payload,
-                msg.sender
-            );
-            gateway.callContract(destinationChain, destinationAddress, payload);
-        }
+    function _sendCrosschain(bytes memory payload) internal {
+        gasService.payNativeGasForContractCall{ value: msg.value }(
+            address(this),
+            destinationChain,
+            destinationAddress,
+            payload,
+            msg.sender
+        );
+        gateway.callContract(destinationChain, destinationAddress, payload);
+    }
+
+    /**
+     * @dev Make the payment from user
+     * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
+     * @param paymentAmount Amount to be paid (without decimals)
+     */
+     function _payment(address paymentTokenAddress, uint256 paymentAmount) internal {
+        if (!whitelistedStable[paymentTokenAddress]) revert InvalidPaymentToken(paymentTokenAddress);
+
+        IERC20Extended paymentToken = IERC20Extended(paymentTokenAddress);
+        uint256 amount = paymentAmount * 10**paymentToken.decimals();
+        bool success = paymentToken.transferFrom(msg.sender, address(this), amount);
+
+        if (!success) revert TokenPaymentFailed(paymentTokenAddress, amount);
     }
 }

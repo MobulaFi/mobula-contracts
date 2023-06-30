@@ -24,6 +24,8 @@ contract Base is Script {
     uint256 internal deployerArbitrumPK;
     uint256 internal deployerPolygonPK;
 
+    address internal constant BUSDC = 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d;
+
     constructor() {
         cocoPK = vm.envUint("PRIVATE_KEY_COCO");
         dadaPK = vm.envUint("PRIVATE_KEY_DADA");

@@ -19,23 +19,20 @@ script-axelar-bnb-topuptoken:
 script-axelar-bnb-revert:
 	forge script script/axelar/AxelarCalls.s.sol:AxelarRevert --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
 
-script-axelar-bnb-reverttoken:
-	forge script script/axelar/AxelarCalls.s.sol:AxelarRevertToken --rpc-url ${BNB_RPC_URL} --broadcast -vvvv
-
 script-deploy-axelar-bnb-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-polygon-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderPolygon --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-arbitrum-sender:
-	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSender --rpc-url ${ARBITRUM_RPC_URL} --broadcast --verify --chain-id 42161 --etherscan-api-key ${ARBISCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployAxelarSender.s.sol:DeployAxelarSenderArbitrum --rpc-url ${ARBITRUM_RPC_URL} --broadcast --verify --chain-id 42161 --etherscan-api-key ${ARBISCAN_API_KEY} -vvvv
 
 script-deploy-axelar-bnb-receiver:
-	forge script script/axelar/DeployAxelarReceiver.s.sol:DeployAxelarReceiver --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployAxelarReceiver.s.sol:DeployAxelarReceiverBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
 
 script-deploy-axelar-polygon-receiver:
-	forge script script/axelar/DeployPolygonAxelarReceiver.s.sol:DeployAxelarReceiver --rpc-url ${POLYGON_RPC_URL} --legacy --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+	forge script script/axelar/DeployAxelarReceiver.s.sol:DeployAxelarReceiverPolygon --rpc-url ${POLYGON_RPC_URL} --legacy --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
 
 #
 #	--- Scripts TESTs ---

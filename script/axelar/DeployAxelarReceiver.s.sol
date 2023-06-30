@@ -5,7 +5,19 @@ import "./Base.s.sol";
 
 import "src/axelar/AxelarReceiver.sol";
 
-contract DeployAxelarReceiver is Base {
+contract DeployAxelarReceiverBNB is Base {
+    function setUp() public {}
+    
+    function run() external {
+        vm.startBroadcast(deployerBNBPK);
+
+        new AxelarReceiver(axelarBNBGateway);
+
+        vm.stopBroadcast();
+    }
+}
+
+contract DeployAxelarReceiverPolygon is Base {
     function setUp() public {}
 
     function run() external {
@@ -15,12 +27,4 @@ contract DeployAxelarReceiver is Base {
 
         vm.stopBroadcast();
     }
-
-    // function run() external {
-    //     vm.startBroadcast(deployerBNBPK);
-
-    //     new AxelarReceiver(axelarBNBGateway);
-
-    //     vm.stopBroadcast();
-    // }
 }
