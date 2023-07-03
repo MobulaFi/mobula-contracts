@@ -255,6 +255,7 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      */
+    // TODO : Return tokenId ?
     function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external {
         _submitToken(ipfsHash, paymentTokenAddress, paymentAmount, msg.sender);
     }

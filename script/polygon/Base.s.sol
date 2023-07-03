@@ -7,8 +7,6 @@ import "forge-std/console.sol";
 contract Base is Script {
     address internal axelarPolygonGateway;
     address internal coco;
-    address internal deployerBNB;
-    address internal deployerArbitrum;
     address internal deployerPolygon;
     address internal senderContract;
     address internal receiverContract;
@@ -32,7 +30,7 @@ contract Base is Script {
         receiverContract = vm.envAddress("TOKENS_PROTOCOL_ADDRESS");
         MOBL = vm.envAddress("POLYGON_MOBL_ADDRESS");
         protocolAPI = vm.envAddress("PROTOCOL_API_ADDRESS");
-        tokensProtocolAddress = vm.envAddress("TOKENS_PROTOCOL_ADDRESS=");
+        tokensProtocolAddress = vm.envAddress("TOKENS_PROTOCOL_ADDRESS");
     }
 
     function toAsciiString(address x) internal pure returns (string memory) {
