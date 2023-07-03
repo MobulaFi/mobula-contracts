@@ -5,48 +5,34 @@ import "forge-std/Script.sol";
 import "forge-std/console.sol";
 
 contract Base is Script {
-    address internal axelarBNBGateway;
-    address internal axelarBNBGas;
-    address internal axelarArbitrumGateway;
-    address internal axelarArbitrumGas;
     address internal axelarPolygonGateway;
-    address internal axelarPolygonGas;
     address internal coco;
-    address internal dada;
     address internal deployerBNB;
     address internal deployerArbitrum;
     address internal deployerPolygon;
     address internal senderContract;
     address internal receiverContract;
     uint256 internal cocoPK;
-    uint256 internal dadaPK;
-    uint256 internal deployerBNBPK;
-    uint256 internal deployerArbitrumPK;
     uint256 internal deployerPolygonPK;
 
-    // Binance-USDC
-    address internal constant BUSDC = 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d;
+    address internal protocolAPI; // TODO : Add API address on env file
+    address internal tokensProtocolAddress; // TODO : Add MobulaTokensProtocol address on env file
+
+    address internal MOBL;
+    address internal USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
 
     constructor() {
         cocoPK = vm.envUint("PRIVATE_KEY_COCO");
-        dadaPK = vm.envUint("PRIVATE_KEY_DADA");
-        deployerBNBPK = vm.envUint("DEPLOYER_PK_BNB");
-        deployerArbitrumPK = vm.envUint("DEPLOYER_PK_ARBITRUM");
         deployerPolygonPK = vm.envUint("DEPLOYER_PK_POLYGON");
         coco = vm.addr(cocoPK);
-        dada = vm.addr(dadaPK);
-        deployerBNB = vm.addr(deployerBNBPK);
-        deployerArbitrum = vm.addr(deployerArbitrumPK);
         deployerPolygon = vm.addr(deployerPolygonPK);
-        axelarBNBGateway = vm.envAddress("BNB_AXELAR_GATEWAY");
-        axelarArbitrumGateway = vm.envAddress("ARBITRUM_AXELAR_GATEWAY");
         axelarPolygonGateway = vm.envAddress("POLYGON_AXELAR_GATEWAY");
-        axelarBNBGas = vm.envAddress("BNB_AXELAR_GAS");
-        axelarArbitrumGas = vm.envAddress("ARBITRUM_AXELAR_GAS");
-        axelarPolygonGas = vm.envAddress("POLYGON_AXELAR_GAS");
         senderContract = vm.envAddress("SENDER_ADDRESS");
         // Polygon (main contract) smart contract address
         receiverContract = vm.envAddress("TOKENS_PROTOCOL_ADDRESS");
+        MOBL = vm.envAddress("POLYGON_MOBL_ADDRESS");
+        protocolAPI = vm.envAddress("PROTOCOL_API_ADDRESS");
+        tokensProtocolAddress = vm.envAddress("TOKENS_PROTOCOL_ADDRESS=");
     }
 
     function toAsciiString(address x) internal pure returns (string memory) {

@@ -13,6 +13,8 @@ contract DeployMobulaCrosschainSenderArbitrum is Base {
 
         MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarArbitrumGateway, axelarArbitrumGas);
 
+        // TODO : Whitelist stablecoins on Arbitrum
+
         string memory destinationChain = "Polygon";
         sender.setDestination(destinationChain, toAsciiString(receiverContract));
 
@@ -38,6 +40,7 @@ contract DeployMobulaCrosschainSenderBNB is Base {
     }
 }
 
+// Not relevant, as the main contract is already on Polygon
 contract DeployMobulaCrosschainSenderPolygon is Base {
     function setUp() public {}
 

@@ -2,6 +2,28 @@
 # (-include to ignore error if it does not exist)
 -include .env
 
+#
+#	--- Deployments Scripts ---
+#
+
+deploy-tokens-protocol:
+	forge script script/polygon/DeployMobulaTokensProtocol.s.sol:DeployMobulaTokensProtocol --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+
+deploy-protocol-api:
+	forge script script/polygon/DeployProtocolAPI.s.sol:DeployProtocolAPI --rpc-url ${POLYGON_RPC_URL} --broadcast --verify --chain-id 137 --etherscan-api-key ${POLYGONSCAN_API_KEY} -vvvv
+
+deploy-axelar-bnb-sender:
+	forge script script/axelar/DeployMobulaCrosschainSender.s.sol:DeployMobulaCrosschainSenderBNB --rpc-url ${BNB_RPC_URL} --broadcast --verify --chain-id 56 --etherscan-api-key ${BSCSCAN_API_KEY} -vvvv
+
+#
+#	--- Update Scripts ---
+#
+
+update-protocol-api:
+	forge script script/polygon/UpdateProtocolAPIAddress.s.sol:UpdateProtocolAPIAddress --rpc-url ${POLYGON_RPC_URL} --broadcast
+
+whitelist-axelar-contracts:
+	forge script script/polygon/WhitelistAxelarContracts.s.sol:WhitelistAxelarContracts --rpc-url ${POLYGON_RPC_URL} --broadcast
 
 #
 #	--- Scripts Axelar ---

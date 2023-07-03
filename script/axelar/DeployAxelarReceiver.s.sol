@@ -5,6 +5,8 @@ import "./Base.s.sol";
 
 import "src/axelar/AxelarReceiver.sol";
 
+// Not relevant anymore, as the main contract is now the receiver
+
 contract DeployAxelarReceiverBNB is Base {
     function setUp() public {}
     

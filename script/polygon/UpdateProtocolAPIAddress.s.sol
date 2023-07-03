@@ -3,15 +3,15 @@ pragma solidity 0.8.19;
 
 import "./Base.s.sol";
 
-import "src/axelar/AxelarReceiver.sol";
+import "src/MobulaTokensProtocol.sol";
 
-contract DeployAxelarReceiver is Base {
+contract UpdateProtocolAPIAddress is Base {
     function setUp() public {}
 
     function run() external {
         vm.startBroadcast(deployerPolygonPK);
 
-        new AxelarReceiver(axelarPolygonGateway);
+        MobulaTokensProtocol(tokensProtocolAddress).updateProtocolAPIAddress(protocolAPI);
 
         vm.stopBroadcast();
     }
