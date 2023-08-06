@@ -41,15 +41,15 @@ contract AxelarSender is AxelarExecutable, Ownable {
         destinationAddress = _destinationAddress;
     }
 
-    function updateTokenAxelar(uint256 tokenId, string memory ipfsHash) external payable {
+    function updateTokenAxelar(uint256 voteId, string memory ipfsHash) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.UpdateToken, msg.sender, address(0), ipfsHash, tokenId, 0));
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.UpdateToken, msg.sender, address(0), ipfsHash, 0, 0, voteId));
 
         _sendCrosschain(payload);
     }
     
-    function submitTokenAxelar(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external payable
+    function submitTokenAxelar(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, uint256 tokenId) external payable
     {
         require(msg.value > 0, 'Gas payment is required');
 
@@ -57,19 +57,19 @@ contract AxelarSender is AxelarExecutable, Ownable {
             _payment(paymentTokenAddress, paymentAmount);
         }
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.SubmitToken, msg.sender, paymentTokenAddress, ipfsHash, 0, paymentAmount));
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.SubmitToken, msg.sender, paymentTokenAddress, ipfsHash, tokenId, paymentAmount, 0));
 
         _sendCrosschain(payload);
     }
 
-    function topUpTokenAxelar(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external payable {
+    function topUpTokenAxelar(uint256 voteId, address paymentTokenAddress, uint256 paymentAmount) external payable {
         require(msg.value > 0, 'Gas payment is required');
 
         if (paymentAmount != 0) {
             _payment(paymentTokenAddress, paymentAmount);
         }
 
-        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, paymentTokenAddress, "", tokenId, paymentAmount));
+        bytes memory payload = abi.encode(MobulaPayload(MobulaMethod.TopUpToken, msg.sender, paymentTokenAddress, "", 0, paymentAmount, voteId));
 
         _sendCrosschain(payload);
     }
