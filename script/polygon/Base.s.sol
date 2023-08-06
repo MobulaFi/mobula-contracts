@@ -6,30 +6,26 @@ import "forge-std/console.sol";
 
 contract Base is Script {
     address internal axelarPolygonGateway;
-    address internal coco;
     address internal deployerPolygon;
     address internal senderContract;
     address internal receiverContract;
-    uint256 internal cocoPK;
     uint256 internal deployerPolygonPK;
 
-    address internal protocolAPI; // TODO : Add API address on env file
+    address internal protocolAPI = vm.envAddress("PROTOCOL_API_ADDRESS"); 
     address internal tokensProtocolAddress; // TODO : Add MobulaTokensProtocol address on env file
 
     address internal MOBL;
     address internal USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
 
     constructor() {
-        cocoPK = vm.envUint("PRIVATE_KEY_COCO");
         deployerPolygonPK = vm.envUint("DEPLOYER_PK_POLYGON");
-        coco = vm.addr(cocoPK);
         deployerPolygon = vm.addr(deployerPolygonPK);
         axelarPolygonGateway = vm.envAddress("POLYGON_AXELAR_GATEWAY");
-        senderContract = vm.envAddress("SENDER_ADDRESS");
+        // senderContract = vm.envAddress("SENDER_ADDRESS");
         // Polygon (main contract) smart contract address
         receiverContract = vm.envAddress("TOKENS_PROTOCOL_ADDRESS");
         MOBL = vm.envAddress("POLYGON_MOBL_ADDRESS");
-        protocolAPI = vm.envAddress("PROTOCOL_API_ADDRESS");
+        // protocolAPI = vm.envAddress("PROTOCOL_API_ADDRESS");
         tokensProtocolAddress = vm.envAddress("TOKENS_PROTOCOL_ADDRESS");
     }
 

@@ -65,6 +65,11 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
     TokenListing[] public tokenListings;
 
     /**
+    * @dev nextTokenId used to track token ID state.
+     */
+    uint256 public nextTokenId;
+
+    /**
      * @dev sortingMaxVotes Maximum votes count for Sorting
      * @dev sortingMinAcceptancesPct Minimum % of Acceptances for Sorting
      * @dev sortingMinModificationsPct Minimum % of ModificationsNeeded for Sorting
@@ -91,6 +96,7 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
      * @dev votesNeededToRankIDemotion Amount of votes needed for a Rank I demotion
      * @dev votesNeededToRankIIDemotion Amount of votes needed for a Rank II demotion
      * @dev voteCooldown Minimum time required between a Token update and a first validation vote
+     * @dev editCoeffMultiplier Coefficient multiplier for Token update (edit)
      */
     uint256 public membersToPromoteToRankI;
     uint256 public membersToPromoteToRankII;
@@ -101,6 +107,7 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
     uint256 public votesNeededToRankIDemotion;
     uint256 public votesNeededToRankIIDemotion;
     uint256 public voteCooldown;
+    uint256 public editCoeffMultiplier;
 
     /**
      * @dev rank User rank
@@ -228,11 +235,11 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
             return new TokenListing[](0);
         }
 
-        uint256[] memory tokenIds = _getStorageArrayForStatus(status);
+        uint256[] memory voteIds = _getStorageArrayForStatus(status);
 
-        TokenListing[] memory listings = new TokenListing[](tokenIds.length);
+        TokenListing[] memory listings = new TokenListing[](voteIds.length);
         for (uint256 i; i < listings.length; i++) {
-            listings[i] = tokenListings[tokenIds[i]];
+            listings[i] = tokenListings[voteIds[i]];
         }
 
         return listings;
@@ -242,11 +249,11 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Allows the submitter of a Token to update Token details
-     * @param tokenId ID of the Token to update
+     * @param voteId ID of the Vote to update
      * @param ipfsHash New IPFS hash of the Token
      */
-    function updateToken(uint256 tokenId, string memory ipfsHash) external {
-        _updateToken(tokenId, ipfsHash, msg.sender);
+    function updateToken(uint256 voteId, string memory ipfsHash) external {
+        _updateToken(voteId, ipfsHash, msg.sender);
     }
 
     /**
@@ -254,20 +261,20 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
      * @param ipfsHash IPFS hash of the Token
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
+     * @param tokenId ID of the Token to update (if update, 0 otherwise)
      */
-    // TODO : Return tokenId ?
-    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount) external {
-        _submitToken(ipfsHash, paymentTokenAddress, paymentAmount, msg.sender);
+    function submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, uint256 tokenId) external {
+        _submitToken(ipfsHash, paymentTokenAddress, paymentAmount, msg.sender, tokenId);
     }
 
     /**
      * @dev Allows a user to top up listing payment
-     * @param tokenId ID of the Token to top up
+     * @param voteId ID of the Vote to top up
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      */
-    function topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount) external {
-        _topUpToken(tokenId, paymentTokenAddress, paymentAmount, msg.sender);
+    function topUpToken(uint256 voteId, address paymentTokenAddress, uint256 paymentAmount) external {
+        _topUpToken(voteId, paymentTokenAddress, paymentAmount, msg.sender);
     }
 
     /**
@@ -292,36 +299,36 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Allows a ranked user to vote for Token Sorting
-     * @param tokenId ID of the Token to vote for
+     * @param voteId ID of the Vote to vote for
      * @param vote User's vote
      * @param utilityScore Utility score
      * @param socialScore Social score
      * @param trustScore Trust score
      */
-    function voteSorting(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
+    function voteSorting(uint256 voteId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
         external
         onlyRanked
     {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+        if (voteId >= tokenListings.length) revert VoteNotFound(voteId);
 
-        TokenListing storage listing = tokenListings[tokenId];
+        TokenListing storage listing = tokenListings[voteId];
 
         if (listing.status != ListingStatus.Sorting) revert NotSortingListing(listing.token, listing.status);
 
         if (listing.token.lastUpdate > block.timestamp - voteCooldown) revert TokenInCooldown(listing.token);
 
-        if (sortingVotesPhase[tokenId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
+        if (sortingVotesPhase[voteId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
 
-        sortingVotesPhase[tokenId][msg.sender] = listing.phase;
+        sortingVotesPhase[voteId][msg.sender] = listing.phase;
 
         if (vote == ListingVote.ModificationsNeeded) {
-            sortingModifications[tokenId].push(msg.sender);
+            sortingModifications[voteId].push(msg.sender);
         } else if (vote == ListingVote.Reject) {
-            sortingRejections[tokenId].push(msg.sender);
+            sortingRejections[voteId].push(msg.sender);
         } else {
             if (utilityScore > 5 || socialScore > 5 || trustScore > 5) revert InvalidScoreValue();
 
-            sortingAcceptances[tokenId].push(msg.sender);
+            sortingAcceptances[voteId].push(msg.sender);
 
             listing.accruedUtilityScore += utilityScore;
             listing.accruedSocialScore += socialScore;
@@ -330,47 +337,47 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
         emit SortingVote(listing.token, msg.sender, vote, utilityScore, socialScore, trustScore);
 
-        if (sortingModifications[tokenId].length * 100 >= sortingMaxVotes * sortingMinModificationsPct) {
-            _updateListingStatus(tokenId, ListingStatus.Updating);
-        } else if (sortingAcceptances[tokenId].length + sortingRejections[tokenId].length + sortingModifications[tokenId].length >= sortingMaxVotes) {
-            if (sortingAcceptances[tokenId].length * 100 >= sortingMaxVotes * sortingMinAcceptancesPct) {
-                _updateListingStatus(tokenId, ListingStatus.Validation);
+        if (sortingModifications[voteId].length * 100 >= sortingMaxVotes * sortingMinModificationsPct) {
+            _updateListingStatus(voteId, ListingStatus.Updating);
+        } else if (sortingAcceptances[voteId].length + sortingRejections[voteId].length + sortingModifications[voteId].length >= sortingMaxVotes) {
+            if (sortingAcceptances[voteId].length * 100 >= sortingMaxVotes * sortingMinAcceptancesPct) {
+                _updateListingStatus(voteId, ListingStatus.Validation);
             } else {
-                _updateListingStatus(tokenId, ListingStatus.Rejected);
+                _updateListingStatus(voteId, ListingStatus.Rejected);
             }
         }
     }
 
     /**
      * @dev Allows a rank II User to vote for Token Validation
-     * @param tokenId ID of the Token to vote for
+     * @param voteId ID of the Token to vote for
      * @param vote User's vote
      * @param utilityScore Utility score
      * @param socialScore Social score
      * @param trustScore Trust score
      */
-    function voteValidation(uint256 tokenId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
+    function voteValidation(uint256 voteId, ListingVote vote, uint256 utilityScore, uint256 socialScore, uint256 trustScore)
         external
         onlyRankII
     {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+        if (voteId >= tokenListings.length) revert VoteNotFound(voteId);
 
-        TokenListing storage listing = tokenListings[tokenId];
+        TokenListing storage listing = tokenListings[voteId];
 
         if (listing.status != ListingStatus.Validation) revert NotValidationListing(listing.token, listing.status);
 
-        if (validationVotesPhase[tokenId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
+        if (validationVotesPhase[voteId][msg.sender] >= listing.phase) revert AlreadyVoted(msg.sender, listing.status, listing.phase);
 
-        validationVotesPhase[tokenId][msg.sender] = listing.phase;
+        validationVotesPhase[voteId][msg.sender] = listing.phase;
 
         if (vote == ListingVote.ModificationsNeeded) {
-            validationModifications[tokenId].push(msg.sender);
+            validationModifications[voteId].push(msg.sender);
         } else if (vote == ListingVote.Reject) {
-            validationRejections[tokenId].push(msg.sender);
+            validationRejections[voteId].push(msg.sender);
         } else {
             if (utilityScore > 5 || socialScore > 5 || trustScore > 5) revert InvalidScoreValue();
 
-            validationAcceptances[tokenId].push(msg.sender);
+            validationAcceptances[voteId].push(msg.sender);
 
             listing.accruedUtilityScore += utilityScore;
             listing.accruedSocialScore += socialScore;
@@ -379,19 +386,19 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
         emit ValidationVote(listing.token, msg.sender, vote, utilityScore, socialScore, trustScore);
 
-        if (validationModifications[tokenId].length * 100 >= validationMaxVotes * validationMinModificationsPct) {
-            _updateListingStatus(tokenId, ListingStatus.Updating);
-        } else if (validationAcceptances[tokenId].length + validationRejections[tokenId].length + validationModifications[tokenId].length >= validationMaxVotes) {
-            if (validationAcceptances[tokenId].length * 100 >= validationMaxVotes * validationMinAcceptancesPct) {
-                _rewardVoters(tokenId, ListingStatus.Validated);
+        if (validationModifications[voteId].length * 100 >= validationMaxVotes * validationMinModificationsPct) {
+            _updateListingStatus(voteId, ListingStatus.Updating);
+        } else if (validationAcceptances[voteId].length + validationRejections[voteId].length + validationModifications[voteId].length >= validationMaxVotes) {
+            if (validationAcceptances[voteId].length * 100 >= validationMaxVotes * validationMinAcceptancesPct) {
+                _rewardVoters(voteId, ListingStatus.Validated);
 
-                _saveToken(tokenId);
+                _saveToken(voteId);
 
-                _updateListingStatus(tokenId, ListingStatus.Validated);
+                _updateListingStatus(voteId, ListingStatus.Validated);
             } else {
-                _rewardVoters(tokenId, ListingStatus.Rejected);
+                _rewardVoters(voteId, ListingStatus.Rejected);
 
-                _updateListingStatus(tokenId, ListingStatus.Rejected);
+                _updateListingStatus(voteId, ListingStatus.Rejected);
             }
         }
     }
@@ -476,23 +483,22 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Allows the owner to remove a Token from the validation process
-     * @param tokenId ID of the Token
+     * @param voteId ID of the Token
      */
-    function emergencyKillRequest(uint256 tokenId) external onlyOwner {
-        _updateListingStatus(tokenId, ListingStatus.Killed);
+    function emergencyKillRequest(uint256 voteId) external onlyOwner {
+        _updateListingStatus(voteId, ListingStatus.Killed);
     }
 
     /**
      * @dev Allows the owner to change a Token listing status
-     * @param tokenId ID of the Token
+     * @param voteId ID of the Token
      * @param status New status of the listing
      */
-     function emergencyUpdateListingStatus(uint256 tokenId, ListingStatus status) external onlyOwner {
-        _updateListingStatus(tokenId, status);
+     function emergencyUpdateListingStatus(uint256 voteId, ListingStatus status) external onlyOwner {
+        _updateListingStatus(voteId, status);
     }
 
     /* Protocol Management */
-    // TODO : Add NatSpec + Events ?
 
     function whitelistStable(address _stableAddress, bool whitelisted) external onlyOwner {
         whitelistedStable[_stableAddress] = whitelisted;
@@ -523,6 +529,13 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
         onlyOwner
     {
         validationMaxVotes = _validationMaxVotes;
+    }
+
+    function updateEditCoeffMultiplier(uint256 _editCoeffMultiplier)
+        external
+        onlyOwner
+    {
+        editCoeffMultiplier = _editCoeffMultiplier;
     }
 
     function updateSortingMinAcceptancesPct(uint256 _sortingMinAcceptancesPct) external onlyOwner {
@@ -659,11 +672,11 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
         MobulaPayload memory mPayload = abi.decode(payload, (MobulaPayload));
         
         if (mPayload.method == MobulaMethod.SubmitToken) {
-            _submitToken(mPayload.ipfsHash, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender);
+            _submitToken(mPayload.ipfsHash, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender, mPayload.tokenId);
         } else if (mPayload.method == MobulaMethod.UpdateToken) {
-            _updateToken(mPayload.tokenId, mPayload.ipfsHash, mPayload.sender);
+            _updateToken(mPayload.voteId, mPayload.ipfsHash, mPayload.sender);
         } else if (mPayload.method == MobulaMethod.TopUpToken) {
-            _topUpToken(mPayload.tokenId, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender);
+            _topUpToken(mPayload.voteId, mPayload.paymentTokenAddress, mPayload.paymentAmount, mPayload.sender);
         } else {
             revert UnknownMethod(mPayload);
         }
@@ -673,14 +686,14 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Allows the submitter of a Token to update Token details
-     * @param tokenId ID of the Token to update
+     * @param voteId ID of the Token to update
      * @param ipfsHash New IPFS hash of the Token
      * @param sourceMsgSender Sender of the tx
      */
-    function _updateToken(uint256 tokenId, string memory ipfsHash, address sourceMsgSender) internal {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+    function _updateToken(uint256 voteId, string memory ipfsHash, address sourceMsgSender) internal {
+        if (voteId >= tokenListings.length) revert VoteNotFound(voteId);
 
-        TokenListing storage listing = tokenListings[tokenId];
+        TokenListing storage listing = tokenListings[voteId];
 
         if (listing.status != ListingStatus.Updating) revert NotUpdatingListing(listing.token, listing.status);
 
@@ -691,8 +704,8 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
         emit TokenDetailsUpdated(listing.token);
         
-        // We put the Token back to Sorting (impossible to be in Pool status)
-        _updateListingStatus(tokenId, ListingStatus.Sorting);
+        // We put the Vote back to Sorting (impossible to be in Pool status)
+        _updateListingStatus(voteId, ListingStatus.Sorting);
     }
     
     /**
@@ -701,8 +714,9 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      * @param sourceMsgSender Sender of the tx
+     * @param tokenId ID of the Token to update (if update, 0 otherwise)
      */
-    function _submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender)
+    function _submitToken(string memory ipfsHash, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender, uint256 tokenId)
         internal
     {
         uint256 coeff;
@@ -722,22 +736,34 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
             }
         }
 
+        if (tokenId != 0 && tokenId >= nextTokenId) {
+            revert TokenNotFound(tokenId);
+        }
+
+        if (tokenId != 0) {
+            coeff += PAYMENT_COEFF * editCoeffMultiplier;
+        }
+
         if (coeff >= PAYMENT_COEFF) {
             status = ListingStatus.Sorting;
         }
 
         Token memory token;
+        TokenListing memory listing;
+
         token.ipfsHash = ipfsHash;
         token.lastUpdate = block.timestamp;
-        
-        TokenListing memory listing;
+        token.id = tokenId != 0 ? tokenId : nextTokenId;
+
         listing.token = token;
         listing.coeff = coeff;
         listing.submitter = sourceMsgSender;
         listing.phase = 1;
 
         tokenListings.push(listing);
-        token.id = tokenListings.length - 1;
+
+        // We are working with a new token, so must update.
+        if (tokenId == 0) nextTokenId += 1;
 
         emit TokenListingSubmitted(sourceMsgSender, listing);
         
@@ -746,36 +772,36 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Allows a user to top up listing payment
-     * @param tokenId ID of the Token to top up
+     * @param voteId ID of the Vote to top up
      * @param paymentTokenAddress Address of ERC20 stablecoins used to pay for listing
      * @param paymentAmount Amount to be paid (without decimals)
      * @param sourceMsgSender Sender of the tx
      */
-    function _topUpToken(uint256 tokenId, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender) internal {
-        if (tokenId >= tokenListings.length) revert TokenNotFound(tokenId);
+    function _topUpToken(uint256 voteId, address paymentTokenAddress, uint256 paymentAmount, address sourceMsgSender) internal {
+        if (voteId >= tokenListings.length) revert VoteNotFound(voteId);
         if (paymentAmount == 0) revert InvalidPaymentAmount();
 
         // If method was called from another chain
         if (msg.sender != sourceMsgSender) {
-            tokenListings[tokenId].coeff += _getCoeff(paymentAmount);
+            tokenListings[voteId].coeff += _getCoeff(paymentAmount);
         } else {
-            tokenListings[tokenId].coeff += _payment(paymentTokenAddress, paymentAmount);
+            tokenListings[voteId].coeff += _payment(paymentTokenAddress, paymentAmount);
         }
 
-        emit TokenListingFunded(sourceMsgSender, tokenListings[tokenId], paymentAmount);
+        emit TokenListingFunded(sourceMsgSender, tokenListings[voteId], paymentAmount);
 
-        if (tokenListings[tokenId].status == ListingStatus.Pool && tokenListings[tokenId].coeff >= PAYMENT_COEFF) {
-            _updateListingStatus(tokenId, ListingStatus.Sorting);
+        if (tokenListings[voteId].status == ListingStatus.Pool && tokenListings[voteId].coeff >= PAYMENT_COEFF) {
+            _updateListingStatus(voteId, ListingStatus.Sorting);
         }
     }
 
     /**
      * @dev Update the status of a listing, by moving the listing/token index from one status array to another one
-     * @param tokenId ID of the Token to vote for
+     * @param voteId ID of the Token to vote for
      * @param status New listing status
      */
-    function _updateListingStatus(uint256 tokenId, ListingStatus status) internal {
-        TokenListing storage listing = tokenListings[tokenId];
+    function _updateListingStatus(uint256 voteId, ListingStatus status) internal {
+        TokenListing storage listing = tokenListings[voteId];
 
         if (status == ListingStatus.Init) revert InvalidStatusUpdate(listing.token, listing.status, status);
 
@@ -794,7 +820,7 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
         // Add listing to new status array
         uint256[] storage toArray = _getStorageArrayForStatus(status);
         listing.statusIndex = toArray.length;
-        toArray.push(tokenId);
+        toArray.push(voteId);
 
         ListingStatus previousStatus = listing.status;
         listing.status = status;
@@ -810,12 +836,12 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
             delete listing.accruedSocialScore;
             delete listing.accruedTrustScore;
 
-            delete sortingAcceptances[tokenId];
-            delete sortingRejections[tokenId];
-            delete sortingModifications[tokenId];
-            delete validationAcceptances[tokenId];
-            delete validationRejections[tokenId];
-            delete validationModifications[tokenId];
+            delete sortingAcceptances[voteId];
+            delete sortingRejections[voteId];
+            delete sortingModifications[voteId];
+            delete validationAcceptances[voteId];
+            delete validationRejections[voteId];
+            delete validationModifications[voteId];
         }
 
         emit ListingStatusUpdated(listing.token, previousStatus, status);
@@ -845,12 +871,12 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Save Token in Protocol API
-     * @param tokenId ID of the Token to save
+     * @param voteId ID of the Vote to save
      */
-    function _saveToken(uint256 tokenId) internal {
-        TokenListing storage listing = tokenListings[tokenId];
+    function _saveToken(uint256 voteId) internal {
+        TokenListing storage listing = tokenListings[voteId];
 
-        uint256 scoresCount = sortingAcceptances[tokenId].length + validationAcceptances[tokenId].length;
+        uint256 scoresCount = sortingAcceptances[voteId].length + validationAcceptances[voteId].length;
 
         // TODO : Handle float value (x10 then round() / 10 ?)
         listing.token.utilityScore = listing.accruedUtilityScore / scoresCount;
@@ -864,45 +890,45 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
     /**
      * @dev Reward voters of a Token listing process
-     * @param tokenId ID of the Token
+     * @param voteId ID of the Token
      * @param finalStatus Final status of the listing
      */
-    function _rewardVoters(uint256 tokenId, ListingStatus finalStatus) internal {
-        uint256 coeff = tokenListings[tokenId].coeff;
+    function _rewardVoters(uint256 voteId, ListingStatus finalStatus) internal {
+        uint256 coeff = tokenListings[voteId].coeff;
 
-        for (uint256 i; i < sortingAcceptances[tokenId].length; i++) {
+        for (uint256 i; i < sortingAcceptances[voteId].length; i++) {
             if (finalStatus == ListingStatus.Validated) {
-                ++goodSortingVotes[sortingAcceptances[tokenId][i]];
-                owedRewards[sortingAcceptances[tokenId][i]] += coeff;
+                ++goodSortingVotes[sortingAcceptances[voteId][i]];
+                owedRewards[sortingAcceptances[voteId][i]] += coeff;
             } else {
-                ++badSortingVotes[sortingAcceptances[tokenId][i]];
+                ++badSortingVotes[sortingAcceptances[voteId][i]];
             }
         }
         
-        for (uint256 i; i < sortingRejections[tokenId].length; i++) {
+        for (uint256 i; i < sortingRejections[voteId].length; i++) {
             if (finalStatus == ListingStatus.Rejected) {
-                ++goodSortingVotes[sortingRejections[tokenId][i]];
-                owedRewards[sortingRejections[tokenId][i]] += coeff;
+                ++goodSortingVotes[sortingRejections[voteId][i]];
+                owedRewards[sortingRejections[voteId][i]] += coeff;
             } else {
-                ++badSortingVotes[sortingRejections[tokenId][i]];
+                ++badSortingVotes[sortingRejections[voteId][i]];
             }
         }
 
-        for (uint256 i; i < validationAcceptances[tokenId].length; i++) {
+        for (uint256 i; i < validationAcceptances[voteId].length; i++) {
             if (finalStatus == ListingStatus.Validated) {
-                ++goodValidationVotes[validationAcceptances[tokenId][i]];
-                owedRewards[validationAcceptances[tokenId][i]] += coeff * 2;
+                ++goodValidationVotes[validationAcceptances[voteId][i]];
+                owedRewards[validationAcceptances[voteId][i]] += coeff * 2;
             } else {
-                ++badValidationVotes[validationAcceptances[tokenId][i]];
+                ++badValidationVotes[validationAcceptances[voteId][i]];
             }
         }
 
-        for (uint256 i; i < validationRejections[tokenId].length; i++) {
+        for (uint256 i; i < validationRejections[voteId].length; i++) {
             if (finalStatus == ListingStatus.Rejected) {
-                ++goodValidationVotes[validationRejections[tokenId][i]];
-                owedRewards[validationRejections[tokenId][i]] += coeff * 2;
+                ++goodValidationVotes[validationRejections[voteId][i]];
+                owedRewards[validationRejections[voteId][i]] += coeff * 2;
             } else {
-                ++badValidationVotes[validationRejections[tokenId][i]];
+                ++badValidationVotes[validationRejections[voteId][i]];
             }
         }
     }

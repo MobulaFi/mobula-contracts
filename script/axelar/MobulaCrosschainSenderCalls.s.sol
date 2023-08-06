@@ -21,7 +21,7 @@ contract MobulaCrosschainSenderSubmitToken is Base {
         
         paymentToken.approve(senderContract, amount);
 
-        MobulaCrosschainSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", BUSDC, paymentAmount);
+        MobulaCrosschainSender(senderContract).submitTokenAxelar{value: amountGas}("testIpfsHash", BUSDC, paymentAmount, 0);
 
         vm.stopBroadcast();
     }

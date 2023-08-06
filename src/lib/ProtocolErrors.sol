@@ -10,6 +10,7 @@ error AlreadyVoted(address voter, ListingStatus status, uint256 listingPhase);
 error InvalidPaymentToken(address paymentToken);
 error TokenPaymentFailed(address paymentToken, uint256 amount);
 error TokenNotFound(uint256 tokenId);
+error VoteNotFound(uint256 voteId);
 error InvalidPaymentAmount();
 error InvalidUpdatingUser(address sender, address submitter);
 error NotSortingListing(Token token, ListingStatus status);

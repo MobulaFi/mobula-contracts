@@ -14,7 +14,7 @@ contract DeployMobulaTokensProtocol is Base {
         MobulaTokensProtocol tokensProtocol = new MobulaTokensProtocol(axelarPolygonGateway, deployerPolygon, MOBL);
 
         // Add USDC as a whitelisted stablecoins to pay for listings
-        tokensProtocol.whitelistStable(USDC, true);
+        // tokensProtocol.whitelistStable(USDC, true);
 
         // TODO : WL each AxelarSender contracts
         // string memory sourceChain = "binance";
@@ -22,35 +22,29 @@ contract DeployMobulaTokensProtocol is Base {
         // tokensProtocol.whitelistAxelarContract(sourceChain, sourceAddress, true);
 
         // TODO : Only call this if API is deployed and API address in env file
-        // tokensProtocol.updateProtocolAPIAddress(protocolAPI);
+        tokensProtocol.updateProtocolAPIAddress(protocolAPI);
 
-        tokensProtocol.updateSubmitFloorPrice(100); // 100$
+        // tokensProtocol.updateSubmitFloorPrice(100); // 100$
 
-        // Votes
-        tokensProtocol.updateSortingMaxVotes(10); // Max 10 votes
-        tokensProtocol.updateValidationMaxVotes(10);
-        tokensProtocol.updateTokensPerVote(10);
+        // // Votes
+        // tokensProtocol.updateSortingMaxVotes(6); // Max 10 votes
+        // tokensProtocol.updateValidationMaxVotes(4);
+        // tokensProtocol.updateTokensPerVote(5);
 
-        tokensProtocol.updateVoteCooldown(3600); // 1H cooldown
-        tokensProtocol.updateWhitelistedCooldown(3600); // 1H cooldown
+        // tokensProtocol.updateVoteCooldown(60 * 30);
+        // tokensProtocol.updateWhitelistedCooldown(60); 
 
-        // %
-        tokensProtocol.updateSortingMinAcceptancesPct(50); // 50%
-        tokensProtocol.updateSortingMinModificationsPct(50); // 50%
+        // // %
+        // tokensProtocol.updateSortingMinAcceptancesPct(50); // 50%
+        // tokensProtocol.updateSortingMinModificationsPct(30); // 50%
 
-        tokensProtocol.updateValidationMinAcceptancesPct(50); // 50%
-        tokensProtocol.updateValidationMinModificationsPct(50); // 50%
+        // tokensProtocol.updateValidationMinAcceptancesPct(50); // 50%
+        // tokensProtocol.updateValidationMinModificationsPct(30); // 50%
+
+        // tokensProtocol.updateEditCoeffMultiplier(1); // Enough for free edits
 
         // Members
-        tokensProtocol.updateMembersToPromoteToRankI(10);
-        tokensProtocol.updateMembersToPromoteToRankII(10);
-        tokensProtocol.updateMembersToDemoteFromRankI(10);
-        tokensProtocol.updateMembersToDemoteFromRankII(10);
-        
-        tokensProtocol.updateVotesNeededToRankIPromotion(5);
-        tokensProtocol.updateVotesNeededToRankIIPromotion(5);
-        tokensProtocol.updateVotesNeededToRankIDemotion(5);
-        tokensProtocol.updateVotesNeededToRankIIDemotion(5);
+
 
         vm.stopBroadcast();
     }

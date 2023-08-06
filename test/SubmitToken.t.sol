@@ -12,7 +12,7 @@ contract SubmitToken is Base {
 
         uint256 newTokenId = tokenListings.length;
 
-        tokensProtocol.submitToken(testHash, address(0), 0);
+        tokensProtocol.submitToken(testHash, address(0), 0, 0);
 
         TokenListing[] memory newTokenListings = tokensProtocol.getTokenListings();
 

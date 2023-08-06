@@ -14,4 +14,5 @@ struct MobulaPayload {
     string ipfsHash;
     uint256 tokenId;
     uint256 paymentAmount;
+    uint256 voteId;
 }

@@ -28,13 +28,15 @@ contract DeployMobulaCrosschainSenderBNB is Base {
     function run() external {
         vm.startBroadcast(deployerBNBPK);
 
-        MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarBNBGateway, axelarBNBGas);
+        // MobulaCrosschainSender sender = new MobulaCrosschainSender(axelarBNBGateway, axelarBNBGas);
+
+       
 
         // B-USDC
-        sender.whitelistStable(BUSDC, true);
+        // sender.whitelistStable(BUSDC, true);
 
         string memory destinationChain = "Polygon";
-        sender.setDestination(destinationChain, toAsciiString(receiverContract));
+         MobulaCrosschainSender(0xBD0ac880252Ef89dEf4Bfdb01208df59C54B1817).whitelistStable(0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d, true);
 
         vm.stopBroadcast();
     }
