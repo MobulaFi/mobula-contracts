@@ -767,7 +767,7 @@ contract MobulaTokensProtocol is AxelarExecutable, Ownable2Step {
 
         emit TokenListingSubmitted(sourceMsgSender, listing);
         
-        _updateListingStatus(token.id, status);
+        _updateListingStatus(tokenListings.length - 1, status);
     }
 
     /**
